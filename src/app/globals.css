@@ -394,6 +394,8 @@ tr:hover td { background: var(--bg-alt); }
 .hidden { display: none; }
 .dragging { opacity: 0.5; border-style: dashed; }
 .drop-target { background: var(--bg-alt); }
+.comment-system { font-style: italic; opacity: 0.7; }
+.event-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 0.85rem; border-bottom: 1px solid var(--border); }
 
 @media (max-width: 760px) {
   .navbar { padding: 0 var(--space-md); overflow-x: auto; }

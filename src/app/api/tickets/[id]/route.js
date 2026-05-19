@@ -43,6 +43,14 @@ export const GET = withAuth(async (_request, _user, context) => {
     ORDER BY t.number ASC
   `).all(id);
 
+  ticket.events = db.prepare(`
+    SELECT te.*, u.username AS actor_username
+    FROM ticket_events te
+    JOIN users u ON u.id = te.actor_id
+    WHERE te.ticket_id = ?
+    ORDER BY te.created_at ASC
+  `).all(id);
+
   return NextResponse.json({ ticket });
 });
 
@@ -56,7 +64,7 @@ export const PATCH = withAuth(async (request, user, context) => {
   const allowed = ['title', 'description', 'status', 'priority', 'sprint_id', 'assignee_id', 'sort_order'];
   const sets = [];
   const args = [];
-  const changedFields = [];
+  const changedFieldDetails = [];
 
   for (const field of allowed) {
     if (!(field in body)) continue;
@@ -80,7 +88,9 @@ export const PATCH = withAuth(async (request, user, context) => {
       }
     }
     const previousValue = existing[field] ?? null;
-    if (value !== previousValue) changedFields.push(FIELD_LABELS[field]);
+    if (value !== previousValue) {
+      changedFieldDetails.push({ field: FIELD_LABELS[field], oldValue: previousValue, newValue: value });
+    }
     sets.push(`${field} = ?`);
     args.push(value);
   }
@@ -90,14 +100,18 @@ export const PATCH = withAuth(async (request, user, context) => {
   args.push(id);
   const tx = db.transaction(() => {
     db.prepare(`UPDATE tickets SET ${sets.join(', ')} WHERE id = ?`).run(...args);
-    if (changedFields.length && existing.creator_id !== user.id) {
-      db.prepare('INSERT INTO comments (id, content, ticket_id, author_id) VALUES (?, ?, ?, ?)')
-        .run(
-          uuidv4(),
-          `${user.username} edited this ticket at ${new Date().toISOString()}.\nChanged: ${changedFields.join(', ')}.`,
-          id,
-          user.id
-        );
+    for (const detail of changedFieldDetails) {
+      db.prepare(
+        `INSERT INTO ticket_events (id, ticket_id, actor_id, kind, field, old_value, new_value, created_at)
+         VALUES (?, ?, ?, 'field_change', ?, ?, ?, datetime('now'))`
+      ).run(
+        uuidv4(),
+        id,
+        user.id,
+        detail.field,
+        detail.oldValue !== null ? String(detail.oldValue) : null,
+        detail.newValue !== null ? String(detail.newValue) : null
+      );
     }
   });
   tx();

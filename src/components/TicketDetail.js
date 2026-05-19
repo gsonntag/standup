@@ -10,16 +10,31 @@ import DependencyPicker from './DependencyPicker';
 import ImageUploadButton from './ImageUploadButton';
 import LabelPicker from './LabelPicker';
 
+function timeAgo(dateString) {
+  const seconds = Math.floor((new Date() - new Date(dateString)) / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
 export default function TicketDetail({ ticketId, initialEditing = false, onClose }) {
   const [activeTicketId, setActiveTicketId] = useState(ticketId);
   const [ticket, setTicket] = useState(null);
   const [comments, setComments] = useState([]);
+  const [events, setEvents] = useState([]);
   const [users, setUsers] = useState([]);
   const [sprints, setSprints] = useState([]);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [originalTitle, setOriginalTitle] = useState('');
+  const [originalDescription, setOriginalDescription] = useState('');
   const [isEditing, setIsEditing] = useState(initialEditing);
   const [showDependencyPicker, setShowDependencyPicker] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
 
   async function fetchTicket() {
     const res = await apiFetch(`/api/tickets/${activeTicketId}`);
@@ -28,6 +43,7 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
       setTicket(data.ticket);
       setTitle(data.ticket.title);
       setDescription(data.ticket.description);
+      setEvents(data.ticket.events || []);
     }
   }
 
@@ -35,6 +51,14 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
     const res = await apiFetch(`/api/tickets/${activeTicketId}/comments`);
     const data = await res.json();
     setComments(data.comments || []);
+  }
+
+  async function fetchCurrentUser() {
+    const res = await apiFetch('/api/auth/me');
+    if (res.ok) {
+      const data = await res.json();
+      setCurrentUser(data.user || null);
+    }
   }
 
   useEffect(() => {
@@ -45,6 +69,7 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
   useEffect(() => {
     fetchTicket();
     fetchComments();
+    fetchCurrentUser();
     apiFetch('/api/users').then((r) => r.json()).then((d) => setUsers(d.users || []));
     apiFetch('/api/sprints').then((r) => r.json()).then((d) => setSprints(d.sprints || []));
   }, [activeTicketId]);
@@ -56,6 +81,12 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
     window.addEventListener('keydown', handleEsc);
     return () => window.removeEventListener('keydown', handleEsc);
   }, [onClose]);
+
+  function startEditing() {
+    setOriginalTitle(title);
+    setOriginalDescription(description);
+    setIsEditing(true);
+  }
 
   async function updateField(field, value) {
     const nextValue = ['sprint_id', 'assignee_id'].includes(field) ? value || null : value;
@@ -71,8 +102,30 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
   }
 
   async function finishEditing() {
-    await updateField('title', title);
-    await updateField('description', description);
+    const titleChanged = title !== originalTitle;
+    const descriptionChanged = description !== originalDescription;
+
+    if (titleChanged || descriptionChanged) {
+      const patch = {};
+      if (titleChanged) patch.title = title;
+      if (descriptionChanged) patch.description = description;
+      const res = await apiFetch(`/api/tickets/${activeTicketId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      if (res.ok) {
+        fetchTicket();
+        fetchComments();
+      }
+    }
+
+    setIsEditing(false);
+  }
+
+  function cancelEditing() {
+    setTitle(originalTitle);
+    setDescription(originalDescription);
     setIsEditing(false);
   }
 
@@ -126,6 +179,12 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
     ? sprints.find((sprint) => sprint.id === ticket.sprint_id)?.name || 'Current sprint'
     : 'No sprint';
 
+  // Merge events and comments for the activity section
+  const activityItems = [
+    ...events.map((e) => ({ ...e, _type: 'event' })),
+    ...comments.map((c) => ({ ...c, _type: 'comment' })),
+  ].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
   return (
     <div className="modal-overlay" onClick={() => onClose({ updated: true })}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -137,16 +196,18 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
                 className="detail-title-input"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                onBlur={() => updateField('title', title)}
               />
             ) : (
               <span className="detail-title-view">{ticket.title}</span>
             )}
           </h2>
           {isEditing ? (
-            <button type="button" className="btn btn-primary btn-sm" onClick={finishEditing}>Done</button>
+            <div className="flex gap-sm">
+              <button type="button" className="btn btn-primary btn-sm" onClick={finishEditing}>Done</button>
+              <button type="button" className="btn btn-sm" onClick={cancelEditing}>Cancel</button>
+            </div>
           ) : (
-            <button type="button" className="btn btn-sm" onClick={() => setIsEditing(true)}>Edit</button>
+            <button type="button" className="btn btn-sm" onClick={startEditing}>Edit</button>
           )}
           <button type="button" className="modal-close" onClick={() => onClose({ updated: true })}>x</button>
         </div>
@@ -163,7 +224,6 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
                     <textarea
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
-                      onBlur={() => updateField('description', description)}
                       onPaste={handleDescriptionPaste}
                       rows={14}
                     />
@@ -174,11 +234,37 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
                 )}
               </div>
               <div className="detail-field">
+                <div className="detail-field-label">Activity</div>
+                {activityItems.map((item) => {
+                  if (item._type === 'event' && item.kind === 'field_change') {
+                    return (
+                      <div className="event-row" key={item.id}>
+                        <span className="text-muted">
+                          {item.actor_username} changed {item.field}: {item.old_value || '(none)'} → {item.new_value || '(none)'}
+                        </span>
+                        <span className="text-muted comment-date">{timeAgo(item.created_at)}</span>
+                      </div>
+                    );
+                  }
+                  return null;
+                })}
+              </div>
+              <div className="detail-field">
                 <div className="detail-field-label">Comments</div>
                 <CommentThread
                   ticketId={activeTicketId}
                   comments={comments}
+                  currentUser={currentUser}
                   onAdded={(comment) => setComments((prev) => [...prev, comment])}
+                  onDeleted={(commentId) =>
+                    setComments((prev) =>
+                      prev.map((c) =>
+                        c.id === commentId
+                          ? { ...c, deleted_at: new Date().toISOString(), deleted_by_username: currentUser?.username }
+                          : c
+                      )
+                    )
+                  }
                 />
               </div>
             </div>

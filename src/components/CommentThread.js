@@ -14,7 +14,7 @@ function timeAgo(dateString) {
   return `${days}d ago`;
 }
 
-export default function CommentThread({ ticketId, comments, onAdded }) {
+export default function CommentThread({ ticketId, comments, onAdded, currentUser, onDeleted }) {
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -35,17 +35,56 @@ export default function CommentThread({ ticketId, comments, onAdded }) {
     }
   }
 
+  async function handleDelete(commentId) {
+    if (!confirm('Delete this comment?')) return;
+    const res = await apiFetch(`/api/tickets/${ticketId}/comments/${commentId}`, { method: 'DELETE' });
+    if (res.ok && onDeleted) {
+      onDeleted(commentId);
+    }
+  }
+
   return (
     <>
-      {comments.map((comment) => (
-        <div className="comment" key={comment.id}>
-          <div className="comment-header">
-            <span className="comment-author">{comment.author_username}</span>
-            <span className="comment-date">{timeAgo(comment.created_at)}</span>
+      {comments.map((comment) => {
+        const isSystem = comment.kind === 'system';
+        const isDeleted = !!comment.deleted_at;
+        const canDelete = !isSystem && !isDeleted && (
+          comment.author_username === currentUser?.username || currentUser?.role === 'admin'
+        );
+
+        return (
+          <div className={`comment${isSystem ? ' comment-system' : ''}`} key={comment.id}>
+            <div className="comment-header">
+              <span className="comment-author">{comment.author_username}</span>
+              <span className="comment-date">{timeAgo(comment.created_at)}</span>
+              {canDelete && (
+                <button
+                  type="button"
+                  className="dep-remove"
+                  onClick={() => handleDelete(comment.id)}
+                  title="Delete comment"
+                >
+                  delete
+                </button>
+              )}
+            </div>
+            <div className="comment-body">
+              {isDeleted ? (
+                <span style={{ textDecoration: 'line-through', color: 'var(--text-muted)' }}>
+                  {comment.content}
+                </span>
+              ) : (
+                comment.content
+              )}
+              {isDeleted && (
+                <span className="text-muted" style={{ marginLeft: '8px', fontSize: 'var(--font-size-sm)' }}>
+                  (deleted by {comment.deleted_by_username})
+                </span>
+              )}
+            </div>
           </div>
-          <div className="comment-body">{comment.content}</div>
-        </div>
-      ))}
+        );
+      })}
       <form className="comment-form" onSubmit={handleSubmit}>
         <textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="Add a comment" />
         <button type="submit" className="btn btn-primary btn-sm" disabled={loading}>

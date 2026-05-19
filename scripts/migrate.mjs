@@ -93,6 +93,32 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_ticket_deps_dep ON ticket_dependencies(depends_on_id);
 `);
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS ticket_events (
+    id         TEXT PRIMARY KEY,
+    ticket_id  TEXT NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+    actor_id   TEXT NOT NULL REFERENCES users(id),
+    kind       TEXT NOT NULL,
+    field      TEXT,
+    old_value  TEXT,
+    new_value  TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_events_ticket ON ticket_events(ticket_id, created_at);
+`);
+
+const commentColumns = db.prepare('PRAGMA table_info(comments)').all().map(c => c.name);
+if (!commentColumns.includes('kind')) {
+  db.exec("ALTER TABLE comments ADD COLUMN kind TEXT NOT NULL DEFAULT 'user'");
+  db.prepare("UPDATE comments SET kind = 'system' WHERE content LIKE '% edited this ticket at %' AND content LIKE '%Changed:%'").run();
+}
+if (!commentColumns.includes('deleted_at')) {
+  db.exec('ALTER TABLE comments ADD COLUMN deleted_at TEXT');
+}
+if (!commentColumns.includes('deleted_by')) {
+  db.exec('ALTER TABLE comments ADD COLUMN deleted_by TEXT REFERENCES users(id)');
+}
+
 const ticketColumns = db.prepare('PRAGMA table_info(tickets)').all().map((column) => column.name);
 if (!ticketColumns.includes('creator_id')) {
   const fallbackUser = db.prepare(`
