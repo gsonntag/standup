@@ -1,0 +1,6 @@
+node_modules
+.next
+data/scrum.db
+data/scrum.db-shm
+data/scrum.db-wal
+npm-debug.log*

@@ -1,0 +1,26 @@
+{
+  "name": "scrum",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "migrate": "node scripts/migrate.mjs",
+    "create-user": "node scripts/create-user.mjs"
+  },
+  "dependencies": {
+    "@dnd-kit/core": "latest",
+    "@dnd-kit/sortable": "latest",
+    "@dnd-kit/utilities": "latest",
+    "bcryptjs": "latest",
+    "better-sqlite3": "latest",
+    "next": "^15.5.18",
+    "react": "latest",
+    "react-dom": "latest",
+    "uuid": "latest"
+  },
+  "overrides": {
+    "postcss": "^8.5.14"
+  }
+}
