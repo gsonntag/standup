@@ -1,6 +1,7 @@
 'use client';
 
 import { useDroppable } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import TicketCard from './TicketCard';
 
 export default function BoardColumn({ currentUser, status, tickets, users, onTicketAssign, onTicketView }) {
@@ -13,16 +14,18 @@ export default function BoardColumn({ currentUser, status, tickets, users, onTic
         <span className="board-column-count">{tickets.length}</span>
       </div>
       <div className="board-column-body">
-        {tickets.map((ticket) => (
-          <TicketCard
-            key={ticket.id}
-            ticket={ticket}
-            currentUser={currentUser}
-            users={users}
-            onAssign={(assigneeId) => onTicketAssign(ticket.id, assigneeId)}
-            onView={() => onTicketView(ticket.id)}
-          />
-        ))}
+        <SortableContext items={tickets.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+          {tickets.map((ticket) => (
+            <TicketCard
+              key={ticket.id}
+              ticket={ticket}
+              currentUser={currentUser}
+              users={users}
+              onAssign={(assigneeId) => onTicketAssign(ticket.id, assigneeId)}
+              onView={() => onTicketView(ticket.id)}
+            />
+          ))}
+        </SortableContext>
       </div>
     </div>
   );

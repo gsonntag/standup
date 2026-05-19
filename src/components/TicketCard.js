@@ -1,10 +1,12 @@
 'use client';
 
-import { useDraggable } from '@dnd-kit/core';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { isOverdue, daysUntil } from '@/lib/dates';
 
 export default function TicketCard({ ticket, users, onAssign, onView }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: ticket.id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: ticket.id });
+  const style = { transform: CSS.Transform.toString(transform), transition };
   const hasUnresolvedBlockers = ticket.unresolved_blocker_count > 0;
 
   function handleAction(e, action) {
@@ -21,6 +23,7 @@ export default function TicketCard({ ticket, users, onAssign, onView }) {
   return (
     <div
       ref={setNodeRef}
+      style={style}
       className={`ticket-card ${isDragging ? 'dragging' : ''}`}
       {...attributes}
       {...listeners}
@@ -72,6 +75,9 @@ export default function TicketCard({ ticket, users, onAssign, onView }) {
           return null;
         })()}
         {hasUnresolvedBlockers && <span className="ticket-card-blocked">BLOCKED</span>}
+        {ticket.story_points != null && (
+          <span className="ticket-card-points" title="Story points">{ticket.story_points}pt</span>
+        )}
         {ticket.assignee_username && (
           <span className="ticket-card-assignee" title={ticket.assignee_username}>
             {ticket.assignee_username.slice(0, 2)}

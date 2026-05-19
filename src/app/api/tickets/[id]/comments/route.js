@@ -43,6 +43,8 @@ export const POST = withAuth(async (request, user, context) => {
   const id = uuidv4();
   db.prepare('INSERT INTO comments (id, content, ticket_id, author_id, kind) VALUES (?, ?, ?, ?, \'user\')')
     .run(id, content.trim(), ticketId, user.id);
+  // Auto-add commenter as watcher
+  db.prepare('INSERT OR IGNORE INTO ticket_watchers (ticket_id, user_id) VALUES (?, ?)').run(ticketId, user.id);
   const comment = db.prepare(`
     SELECT c.*, u.username AS author_username,
            c.kind, c.deleted_at,

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { apiFetch } from '@/lib/client-api';
 import { PRIORITIES, STATUSES } from '@/lib/constants';
 import { uploadPastedImage } from '@/lib/description-paste';
@@ -35,6 +35,9 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
   const [isEditing, setIsEditing] = useState(initialEditing);
   const [showDependencyPicker, setShowDependencyPicker] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  const [storyPointsInput, setStoryPointsInput] = useState('');
+  const attachFileRef = useRef(null);
+  const [attachUploading, setAttachUploading] = useState(false);
 
   async function fetchTicket() {
     const res = await apiFetch(`/api/tickets/${activeTicketId}`);
@@ -44,6 +47,7 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
       setTitle(data.ticket.title);
       setDescription(data.ticket.description);
       setEvents(data.ticket.events || []);
+      setStoryPointsInput(data.ticket.story_points != null ? String(data.ticket.story_points) : '');
     }
   }
 
@@ -162,6 +166,50 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
     if (!confirm('Delete this ticket?')) return;
     const res = await apiFetch(`/api/tickets/${activeTicketId}`, { method: 'DELETE' });
     if (res.ok) onClose({ deleted: true });
+  }
+
+  async function toggleWatcher() {
+    if (!currentUser) return;
+    const isWatching = ticket.watchers?.some((w) => w.id === currentUser.id);
+    if (isWatching) {
+      await apiFetch(`/api/tickets/${activeTicketId}/watchers/${currentUser.id}`, { method: 'DELETE' });
+    } else {
+      await apiFetch(`/api/tickets/${activeTicketId}/watchers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: currentUser.id }),
+      });
+    }
+    fetchTicket();
+  }
+
+  async function handleAttachFile(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setAttachUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('image', file);
+      fd.append('ticket_id', activeTicketId);
+      const res = await apiFetch('/api/uploads', { method: 'POST', body: fd });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || 'Upload failed.');
+        return;
+      }
+      fetchTicket();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setAttachUploading(false);
+    }
+  }
+
+  function formatBytes(bytes) {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   }
 
   if (!ticket) {
@@ -294,6 +342,31 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
                 )}
               </div>
               <div className="detail-field">
+                <div className="detail-field-label">Points</div>
+                <input
+                  type="number"
+                  min="1"
+                  style={{ width: '80px' }}
+                  value={storyPointsInput}
+                  onChange={(e) => setStoryPointsInput(e.target.value)}
+                  onBlur={() => {
+                    const val = storyPointsInput === '' ? null : parseInt(storyPointsInput, 10);
+                    if (storyPointsInput !== '' && (isNaN(val) || val < 1)) return;
+                    const current = ticket.story_points ?? null;
+                    if (val !== current) updateField('story_points', val);
+                  }}
+                  placeholder="—"
+                />
+              </div>
+              <div className="detail-field">
+                <div className="detail-field-label">Due Date</div>
+                <input
+                  type="date"
+                  value={ticket.due_date || ''}
+                  onChange={(e) => updateField('due_date', e.target.value || null)}
+                />
+              </div>
+              <div className="detail-field">
                 <div className="detail-field-label">Assignee</div>
                 {isEditing ? (
                   <select id="detail-assignee" value={ticket.assignee_id || ''} onChange={(e) => updateField('assignee_id', e.target.value)}>
@@ -368,6 +441,56 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
                     </li>
                   ))}
                 </ul>
+              </div>
+              <div className="detail-field">
+                <div className="detail-field-label">Watchers</div>
+                <div className="flex gap-sm" style={{ flexWrap: 'wrap', marginBottom: '4px' }}>
+                  {ticket.watchers?.map((w) => (
+                    <span key={w.id} className="label">@{w.username}</span>
+                  ))}
+                  {!ticket.watchers?.length && <span className="detail-value">None</span>}
+                </div>
+                {currentUser && (
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    onClick={toggleWatcher}
+                  >
+                    {ticket.watchers?.some((w) => w.id === currentUser.id) ? 'Unwatch' : 'Watch'}
+                  </button>
+                )}
+              </div>
+              <div className="detail-field">
+                <div className="detail-field-label">Attachments</div>
+                {ticket.attachments?.length > 0 && (
+                  <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 8px 0' }}>
+                    {ticket.attachments.map((att) => (
+                      <li key={att.id} style={{ marginBottom: '4px' }}>
+                        <a href={att.url} target="_blank" rel="noopener noreferrer" className="label-picker-item">
+                          {att.filename}
+                        </a>
+                        <span className="text-muted" style={{ marginLeft: '4px', fontSize: '0.75em' }}>
+                          ({formatBytes(att.size_bytes)})
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <input
+                  ref={attachFileRef}
+                  className="hidden"
+                  type="file"
+                  accept="image/png,image/jpeg,image/gif,image/webp"
+                  onChange={handleAttachFile}
+                />
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  disabled={attachUploading}
+                  onClick={() => attachFileRef.current?.click()}
+                >
+                  {attachUploading ? 'Uploading...' : 'Attach file'}
+                </button>
               </div>
               {isEditing && <button type="button" className="btn btn-danger btn-sm" onClick={deleteTicket}>Delete ticket</button>}
             </aside>

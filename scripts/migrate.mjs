@@ -147,5 +147,35 @@ db.exec(`
   END;
 `);
 
+// Due date and story points columns
+const ticketCols = db.prepare('PRAGMA table_info(tickets)').all().map(c => c.name);
+if (!ticketCols.includes('due_date')) {
+  db.exec('ALTER TABLE tickets ADD COLUMN due_date TEXT');
+}
+if (!ticketCols.includes('story_points')) {
+  db.exec('ALTER TABLE tickets ADD COLUMN story_points INTEGER');
+}
+
+// Attachments and watchers tables
+db.exec(`
+  CREATE TABLE IF NOT EXISTS ticket_attachments (
+    id          TEXT PRIMARY KEY,
+    ticket_id   TEXT NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+    url         TEXT NOT NULL,
+    filename    TEXT NOT NULL,
+    mime_type   TEXT NOT NULL,
+    size_bytes  INTEGER NOT NULL,
+    uploader_id TEXT NOT NULL REFERENCES users(id),
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_attachments_ticket ON ticket_attachments(ticket_id);
+
+  CREATE TABLE IF NOT EXISTS ticket_watchers (
+    ticket_id TEXT NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+    user_id   TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    PRIMARY KEY (ticket_id, user_id)
+  );
+`);
+
 console.log('Migrations complete. Database at:', DB_PATH);
 db.close();
