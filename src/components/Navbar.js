@@ -8,7 +8,6 @@ const NAV_LINKS = [
   { href: '/', label: 'Board' },
   { href: '/backlog', label: 'Backlog' },
   { href: '/sprints', label: 'Sprints' },
-  { href: '/team', label: 'Team' },
   { href: '/my-tasks', label: 'My Tasks' },
 ];
 
@@ -136,6 +135,7 @@ export default function Navbar({ user }) {
         )}
       </div>
       <div className="navbar-right">
+        <a href="/team" className={`text-muted${pathname === '/team' ? ' active' : ''}`} style={{ fontSize: '0.875rem' }}>Team</a>
         <span className="navbar-user">{user.username}</span>
         <span className="text-muted">({user.role})</span>
         <button type="button" onClick={handleLogout} className="btn btn-sm">logout</button>
