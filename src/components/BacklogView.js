@@ -52,6 +52,8 @@ function SortableRow({ ticket, movableSprints, onView, onMoveToSprint }) {
 
 export default function BacklogView() {
   const [tickets, setTickets] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [offset, setOffset] = useState(0);
   const [users, setUsers] = useState([]);
   const [sprints, setSprints] = useState([]);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -59,14 +61,19 @@ export default function BacklogView() {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
-  async function fetchTickets() {
-    const res = await apiFetch('/api/tickets?sprint_id=none');
+  async function fetchTickets(fetchOffset = 0) {
+    const res = await apiFetch(`/api/tickets?sprint_id=none&limit=50&offset=${fetchOffset}`);
     const data = await res.json();
-    setTickets(data.tickets || []);
+    if (fetchOffset > 0) {
+      setTickets((prev) => [...prev, ...(data.tickets || [])]);
+    } else {
+      setTickets(data.tickets || []);
+    }
+    setTotal(data.total || 0);
   }
 
   useEffect(() => {
-    fetchTickets();
+    fetchTickets(0);
     apiFetch('/api/users').then((r) => r.json()).then((d) => setUsers(d.users || []));
     apiFetch('/api/sprints').then((r) => r.json()).then((d) => setSprints(d.sprints || []));
   }, []);
@@ -74,6 +81,7 @@ export default function BacklogView() {
   async function moveToSprint(ticketId, sprintId) {
     if (!sprintId) return;
     setTickets((prev) => prev.filter((ticket) => ticket.id !== ticketId));
+    setTotal((prev) => Math.max(0, prev - 1));
     await apiFetch(`/api/tickets/${ticketId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -101,8 +109,8 @@ export default function BacklogView() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ position }),
     }).then((res) => {
-      if (!res.ok) fetchTickets();
-    }).catch(fetchTickets);
+      if (!res.ok) fetchTickets(0);
+    }).catch(() => fetchTickets(0));
   }
 
   const movableSprints = sprints.filter((sprint) => sprint.status === 'planning' || sprint.status === 'active');
@@ -167,12 +175,27 @@ export default function BacklogView() {
           </table>
         </div>
       )}
+      {tickets.length < total && (
+        <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={() => {
+              const nextOffset = offset + 50;
+              setOffset(nextOffset);
+              fetchTickets(nextOffset);
+            }}
+          >
+            Load more ({tickets.length}/{total})
+          </button>
+        </div>
+      )}
       {selectedTicketId && (
         <TicketDetail
           ticketId={selectedTicketId}
           onClose={({ deleted, updated } = {}) => {
             setSelectedTicketId(null);
-            if (deleted || updated) fetchTickets();
+            if (deleted || updated) fetchTickets(0);
           }}
         />
       )}

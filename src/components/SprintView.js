@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/client-api';
 
-function SprintCard({ sprint, isAdmin, onAction }) {
+function SprintCard({ sprint, isAdmin, onAction, onCompleteWithRollover }) {
   return (
     <div className="sprint-card">
       <div className="sprint-card-header">
@@ -15,20 +15,26 @@ function SprintCard({ sprint, isAdmin, onAction }) {
         {sprint.status === 'completed'
           ? `${sprint.done_count}/${sprint.ticket_count} done`
           : `${sprint.ticket_count} tickets - ${sprint.done_count} done`}
+        {sprint.total_points > 0 && (
+          <span style={{ marginLeft: '0.5rem' }}>{sprint.done_points}/{sprint.total_points} pts</span>
+        )}
       </div>
-      {isAdmin && (
-        <div className="mt-lg flex gap-md">
-          {sprint.status === 'planning' && (
-            <>
-              <button className="btn btn-sm btn-primary" onClick={() => onAction('start', sprint.id)}>Start Sprint</button>
-              <button className="btn btn-sm btn-danger" onClick={() => onAction('delete', sprint.id)}>Delete</button>
-            </>
-          )}
-          {sprint.status === 'active' && (
-            <button className="btn btn-sm" onClick={() => onAction('complete', sprint.id)}>Complete Sprint</button>
-          )}
-        </div>
-      )}
+      <div className="mt-lg flex gap-md">
+        <a href={`/sprints/${sprint.id}/retro`} className="btn btn-sm">Retro</a>
+        {isAdmin && (
+          <>
+            {sprint.status === 'planning' && (
+              <>
+                <button className="btn btn-sm btn-primary" onClick={() => onAction('start', sprint.id)}>Start Sprint</button>
+                <button className="btn btn-sm btn-danger" onClick={() => onAction('delete', sprint.id)}>Delete</button>
+              </>
+            )}
+            {sprint.status === 'active' && (
+              <button className="btn btn-sm" onClick={() => onCompleteWithRollover(sprint.id)}>Complete Sprint</button>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -102,6 +108,8 @@ function CreateSprintForm({ onCreated, onCancel }) {
 export default function SprintView({ currentUser }) {
   const [sprints, setSprints] = useState([]);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [completingSprintId, setCompletingSprintId] = useState(null);
+  const [rolloverDestination, setRolloverDestination] = useState('backlog');
 
   async function fetchSprints() {
     const res = await apiFetch('/api/sprints');
@@ -125,17 +133,29 @@ export default function SprintView({ currentUser }) {
         alert(data.error || 'Failed to start sprint.');
         return;
       }
-    } else if (action === 'complete') {
-      if (!confirm('Complete this sprint? Unfinished tickets will move to backlog.')) return;
-      await apiFetch(`/api/sprints/${sprintId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'completed' }),
-      });
     } else if (action === 'delete') {
       if (!confirm('Delete this sprint? Tickets will be unassigned.')) return;
       await apiFetch(`/api/sprints/${sprintId}`, { method: 'DELETE' });
     }
+    fetchSprints();
+  }
+
+  function handleCompleteWithRollover(sprintId) {
+    setRolloverDestination('backlog');
+    setCompletingSprintId(sprintId);
+  }
+
+  async function confirmComplete() {
+    const res = await apiFetch(`/api/sprints/${completingSprintId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'completed', rollover_to: rolloverDestination }),
+    });
+    if (!res.ok) {
+      const data = await res.json();
+      alert(data.error || 'Failed to complete sprint.');
+    }
+    setCompletingSprintId(null);
     fetchSprints();
   }
 
@@ -145,6 +165,7 @@ export default function SprintView({ currentUser }) {
     return new Date(b.start_date) - new Date(a.start_date);
   });
   const isAdmin = currentUser?.role === 'admin';
+  const planningSprints = sprints.filter((s) => s.status === 'planning');
 
   return (
     <div className="page">
@@ -161,8 +182,38 @@ export default function SprintView({ currentUser }) {
           onCancel={() => setShowCreateForm(false)}
         />
       )}
+      {completingSprintId && (
+        <div className="modal-overlay" onClick={() => setCompletingSprintId(null)}>
+          <div className="modal" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Complete Sprint</h2>
+              <button type="button" className="modal-close" onClick={() => setCompletingSprintId(null)}>x</button>
+            </div>
+            <div className="modal-body">
+              <p>Move unfinished tickets to:</p>
+              <select value={rolloverDestination} onChange={(e) => setRolloverDestination(e.target.value)} style={{ width: '100%', marginBottom: '1rem' }}>
+                <option value="backlog">Backlog</option>
+                <option value="next_planning">Next planning sprint (oldest)</option>
+                {planningSprints.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+              <div className="flex gap-md">
+                <button type="button" className="btn btn-sm btn-primary" onClick={confirmComplete}>Complete Sprint</button>
+                <button type="button" className="btn btn-sm" onClick={() => setCompletingSprintId(null)}>Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {sortedSprints.map((sprint) => (
-        <SprintCard key={sprint.id} sprint={sprint} isAdmin={isAdmin} onAction={handleAction} />
+        <SprintCard
+          key={sprint.id}
+          sprint={sprint}
+          isAdmin={isAdmin}
+          onAction={handleAction}
+          onCompleteWithRollover={handleCompleteWithRollover}
+        />
       ))}
       {sprints.length === 0 && (
         <div className="empty">

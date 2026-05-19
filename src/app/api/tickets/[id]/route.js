@@ -193,9 +193,14 @@ export const PATCH = withAuth(async (request, user, context) => {
   return NextResponse.json({ ticket: getTicketById(db, id) });
 });
 
-export const DELETE = withAuth(async (_request, _user, context) => {
+export const DELETE = withAuth(async (_request, user, context) => {
   const db = getDb();
   const id = await getId(context);
+  const ticket = db.prepare('SELECT creator_id FROM tickets WHERE id = ?').get(id);
+  if (!ticket) return jsonError('Ticket not found.', 404);
+  if (user.role !== 'admin' && ticket.creator_id !== user.id) {
+    return jsonError('Only the ticket creator or an admin can delete this ticket.', 403);
+  }
   db.prepare('DELETE FROM tickets WHERE id = ?').run(id);
   return NextResponse.json({ ok: true });
 });

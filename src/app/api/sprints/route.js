@@ -12,7 +12,9 @@ export const GET = withAuth(async () => {
   const sprints = db.prepare(`
     SELECT s.*,
       (SELECT COUNT(*) FROM tickets WHERE sprint_id = s.id) AS ticket_count,
-      (SELECT COUNT(*) FROM tickets WHERE sprint_id = s.id AND status = 'done') AS done_count
+      (SELECT COUNT(*) FROM tickets WHERE sprint_id = s.id AND status = 'done') AS done_count,
+      (SELECT COALESCE(SUM(story_points), 0) FROM tickets WHERE sprint_id = s.id) AS total_points,
+      (SELECT COALESCE(SUM(story_points), 0) FROM tickets WHERE sprint_id = s.id AND status = 'done') AS done_points
     FROM sprints s
     ORDER BY start_date DESC
   `).all();

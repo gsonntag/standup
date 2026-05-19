@@ -492,7 +492,9 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
                   {attachUploading ? 'Uploading...' : 'Attach file'}
                 </button>
               </div>
-              {isEditing && <button type="button" className="btn btn-danger btn-sm" onClick={deleteTicket}>Delete ticket</button>}
+              {isEditing && (currentUser?.role === 'admin' || ticket?.creator_id === currentUser?.id) && (
+                <button type="button" className="btn btn-danger btn-sm" onClick={deleteTicket}>Delete ticket</button>
+              )}
             </aside>
           </div>
         </div>

@@ -77,6 +77,15 @@ export const GET = withAuth(async (request) => {
     args.push(searchParams.get('assignee_id'));
   }
 
+  const total = db.prepare(`
+    SELECT COUNT(*) AS count
+    FROM tickets t
+    ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+  `).get(...args).count;
+
+  const limit = Math.min(parseInt(searchParams.get('limit') || '100', 10), 500);
+  const offset = parseInt(searchParams.get('offset') || '0', 10);
+
   const tickets = db.prepare(`
     SELECT t.*,
       assignee.username AS assignee_username,
@@ -93,9 +102,10 @@ export const GET = withAuth(async (request) => {
     JOIN users creator ON creator.id = t.creator_id
     ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
     ORDER BY t.sort_order ASC, t.created_at DESC
-  `).all(...args);
+    LIMIT ? OFFSET ?
+  `).all(...args, limit, offset);
 
-  return NextResponse.json({ tickets: attachLabels(db, tickets) });
+  return NextResponse.json({ tickets: attachLabels(db, tickets), total });
 });
 
 export const POST = withAuth(async (request, user) => {

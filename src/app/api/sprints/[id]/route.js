@@ -54,11 +54,29 @@ export const PATCH = withAdmin(async (request, _user, context) => {
   if (new Date(nextEnd) <= new Date(nextStart)) return jsonError('End date must be after start date.');
   if (!sets.length) return NextResponse.json({ sprint });
 
+  let targetSprintId = null;
+  if (body.status === 'completed') {
+    const rolloverTo = body.rollover_to || 'backlog';
+    if (rolloverTo !== 'backlog') {
+      if (rolloverTo === 'next_planning') {
+        const nextSprint = db.prepare("SELECT id FROM sprints WHERE status = 'planning' AND id != ? ORDER BY created_at ASC LIMIT 1").get(id);
+        targetSprintId = nextSprint?.id || null;
+      } else {
+        const targetSprint = db.prepare("SELECT id FROM sprints WHERE id = ? AND status = 'planning'").get(rolloverTo);
+        if (!targetSprint) return jsonError('Target sprint not found or not in planning.', 400);
+        targetSprintId = rolloverTo;
+      }
+    }
+  }
+
   const tx = db.transaction(() => {
     db.prepare(`UPDATE sprints SET ${sets.join(', ')} WHERE id = ?`).run(...args, id);
     if (body.status === 'completed') {
-      db.prepare("UPDATE tickets SET sprint_id = NULL, status = 'backlog' WHERE sprint_id = ? AND status != 'done'")
-        .run(id);
+      if (targetSprintId) {
+        db.prepare("UPDATE tickets SET sprint_id = ?, status = 'todo' WHERE sprint_id = ? AND status != 'done'").run(targetSprintId, id);
+      } else {
+        db.prepare("UPDATE tickets SET sprint_id = NULL, status = 'backlog' WHERE sprint_id = ? AND status != 'done'").run(id);
+      }
     }
   });
   tx();

@@ -177,5 +177,18 @@ db.exec(`
   );
 `);
 
+// retro_notes table
+db.exec(`
+  CREATE TABLE IF NOT EXISTS retro_notes (
+    id         TEXT PRIMARY KEY,
+    sprint_id  TEXT NOT NULL REFERENCES sprints(id) ON DELETE CASCADE,
+    category   TEXT NOT NULL CHECK (category IN ('went_well', 'improve')),
+    content    TEXT NOT NULL,
+    author_id  TEXT NOT NULL REFERENCES users(id),
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_retro_notes_sprint ON retro_notes(sprint_id);
+`);
+
 console.log('Migrations complete. Database at:', DB_PATH);
 db.close();
