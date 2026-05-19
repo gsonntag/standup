@@ -199,5 +199,17 @@ db.exec(`
   );
 `);
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS mentions (
+    id           TEXT PRIMARY KEY,
+    comment_id   TEXT NOT NULL REFERENCES comments(id) ON DELETE CASCADE,
+    ticket_id    TEXT NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+    user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    acknowledged INTEGER NOT NULL DEFAULT 0,
+    created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_mentions_user ON mentions(user_id, acknowledged);
+`);
+
 console.log('Migrations complete. Database at:', DB_PATH);
 db.close();

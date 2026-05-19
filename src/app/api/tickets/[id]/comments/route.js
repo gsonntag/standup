@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import { jsonError, withAuth } from '@/lib/api';
 import { getDb } from '@/lib/db';
+import { publish } from '@/lib/events';
 
 async function getId(context) {
   const params = await context.params;
@@ -45,6 +46,21 @@ export const POST = withAuth(async (request, user, context) => {
     .run(id, content.trim(), ticketId, user.id);
   // Auto-add commenter as watcher
   db.prepare('INSERT OR IGNORE INTO ticket_watchers (ticket_id, user_id) VALUES (?, ?)').run(ticketId, user.id);
+  // Parse @mentions and insert rows
+  const mentionPattern = /@(\w{1,32})/g;
+  let match;
+  const mentionedUserIds = new Set();
+  while ((match = mentionPattern.exec(content)) !== null) {
+    const username = match[1];
+    const mentioned = db.prepare('SELECT id FROM users WHERE username = ?').get(username);
+    if (mentioned && mentioned.id !== user.id) {
+      mentionedUserIds.add(mentioned.id);
+    }
+  }
+  for (const mentionedId of mentionedUserIds) {
+    db.prepare('INSERT INTO mentions (id, comment_id, ticket_id, user_id) VALUES (?, ?, ?, ?)')
+      .run(uuidv4(), id, ticketId, mentionedId);
+  }
   const comment = db.prepare(`
     SELECT c.*, u.username AS author_username,
            c.kind, c.deleted_at,
@@ -54,5 +70,6 @@ export const POST = withAuth(async (request, user, context) => {
     LEFT JOIN users del ON del.id = c.deleted_by
     WHERE c.id = ?
   `).get(id);
+  publish({ kind: 'comment', ticket_id: ticketId });
   return NextResponse.json({ comment }, { status: 201 });
 });

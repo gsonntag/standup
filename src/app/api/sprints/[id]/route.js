@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { jsonError, withAdmin } from '@/lib/api';
 import { getDb } from '@/lib/db';
 import { SPRINT_STATUSES } from '@/lib/constants';
+import { publish } from '@/lib/events';
 
 const STATUS_VALUES = new Set(SPRINT_STATUSES.map((s) => s.value));
 
@@ -81,6 +82,7 @@ export const PATCH = withAdmin(async (request, _user, context) => {
   });
   tx();
 
+  publish({ kind: 'sprint', id, action: body.status || 'updated' });
   return NextResponse.json({ sprint: db.prepare('SELECT * FROM sprints WHERE id = ?').get(id) });
 });
 

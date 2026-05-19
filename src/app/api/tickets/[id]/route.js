@@ -4,6 +4,7 @@ import { jsonError, withAuth } from '@/lib/api';
 import { getDb } from '@/lib/db';
 import { PRIORITIES, STATUSES } from '@/lib/constants';
 import { getTicketById } from '../route';
+import { publish } from '@/lib/events';
 
 const STATUS_VALUES = new Set(STATUSES.map((s) => s.value));
 const PRIORITY_VALUES = new Set(PRIORITIES.map((p) => p.value));
@@ -190,6 +191,7 @@ export const PATCH = withAuth(async (request, user, context) => {
     reorderTx();
   }
 
+  publish({ kind: 'ticket', id, action: 'updated' });
   return NextResponse.json({ ticket: getTicketById(db, id) });
 });
 
@@ -202,5 +204,6 @@ export const DELETE = withAuth(async (_request, user, context) => {
     return jsonError('Only the ticket creator or an admin can delete this ticket.', 403);
   }
   db.prepare('DELETE FROM tickets WHERE id = ?').run(id);
+  publish({ kind: 'ticket', id, action: 'deleted' });
   return NextResponse.json({ ok: true });
 });

@@ -9,6 +9,7 @@ import BoardColumn from './BoardColumn';
 import TicketCard from './TicketCard';
 import TicketDetail from './TicketDetail';
 import { useToast, ToastContainer } from './Toast';
+import { useRealtime } from '@/lib/realtime';
 
 export default function Board({ sprintId, currentUser }) {
   const [tickets, setTickets] = useState([]);
@@ -53,6 +54,8 @@ export default function Board({ sprintId, currentUser }) {
     apiFetch('/api/users').then((res) => res.json()).then((data) => setUsers(data.users || []));
     fetchWipLimits();
   }, [sprintId]);
+
+  useRealtime((event) => { if (event.kind === 'ticket') fetchTickets(); });
 
   function handleDragStart(event) {
     const { active } = event;

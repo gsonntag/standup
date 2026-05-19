@@ -5,6 +5,7 @@ import { apiFetch } from '@/lib/client-api';
 import { PRIORITIES, STATUSES } from '@/lib/constants';
 import { uploadPastedImage } from '@/lib/description-paste';
 import CommentThread from './CommentThread';
+import { useRealtime } from '@/lib/realtime';
 import DescriptionPreview from './DescriptionPreview';
 import DependencyPicker from './DependencyPicker';
 import ImageUploadButton from './ImageUploadButton';
@@ -85,6 +86,11 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
     window.addEventListener('keydown', handleEsc);
     return () => window.removeEventListener('keydown', handleEsc);
   }, [onClose]);
+
+  useRealtime((event) => {
+    if (event.kind === 'ticket' && event.id === activeTicketId) fetchTicket();
+    if (event.kind === 'comment' && event.ticket_id === activeTicketId) fetchComments();
+  });
 
   function startEditing() {
     setOriginalTitle(title);
@@ -303,6 +309,7 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
                   ticketId={activeTicketId}
                   comments={comments}
                   currentUser={currentUser}
+                  users={users}
                   onAdded={(comment) => setComments((prev) => [...prev, comment])}
                   onDeleted={(commentId) =>
                     setComments((prev) =>

@@ -9,6 +9,7 @@ const NAV_LINKS = [
   { href: '/backlog', label: 'Backlog' },
   { href: '/sprints', label: 'Sprints' },
   { href: '/team', label: 'Team' },
+  { href: '/my-tasks', label: 'My Tasks' },
 ];
 
 export default function Navbar({ user }) {
@@ -18,6 +19,7 @@ export default function Navbar({ user }) {
   const [results, setResults] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
+  const [unreadCount, setUnreadCount] = useState(0);
   const debounceRef = useRef(null);
   const containerRef = useRef(null);
   const searchInputRef = useRef(null);
@@ -41,6 +43,10 @@ export default function Navbar({ user }) {
     }
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  useEffect(() => {
+    apiFetch('/api/me/mentions').then((r) => r.json()).then((d) => setUnreadCount(d.unread_count || 0));
   }, []);
 
   function handleSearchChange(e) {
@@ -92,6 +98,7 @@ export default function Navbar({ user }) {
           <li key={link.href}>
             <a href={link.href} className={pathname === link.href ? 'active' : ''}>
               {link.label}
+              {link.href === '/my-tasks' && unreadCount > 0 && ` (${unreadCount})`}
             </a>
           </li>
         ))}
