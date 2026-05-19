@@ -1,6 +1,7 @@
 'use client';
 
 import { useDraggable } from '@dnd-kit/core';
+import { isOverdue, daysUntil } from '@/lib/dates';
 
 export default function TicketCard({ ticket, users, onAssign, onView }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: ticket.id });
@@ -60,6 +61,16 @@ export default function TicketCard({ ticket, users, onAssign, onView }) {
             </span>
           ))}
         </span>
+        {ticket.due_date && (() => {
+          const days = daysUntil(ticket.due_date);
+          if (isOverdue(ticket.due_date)) {
+            return <span className="due-date overdue">overdue</span>;
+          }
+          if (days <= 3) {
+            return <span className="due-date due-soon">due {days === 0 ? 'today' : `in ${days}d`}</span>;
+          }
+          return null;
+        })()}
         {hasUnresolvedBlockers && <span className="ticket-card-blocked">BLOCKED</span>}
         {ticket.assignee_username && (
           <span className="ticket-card-assignee" title={ticket.assignee_username}>

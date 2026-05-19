@@ -409,3 +409,7 @@ tr:hover td { background: var(--bg-alt); }
 .search-dropdown { position: absolute; top: calc(100% + 4px); left: 0; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 4px; z-index: 1000; max-height: 300px; overflow-y: auto; min-width: 360px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
 .search-result { padding: 8px 12px; cursor: pointer; font-size: 0.875rem; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .search-result:hover, .search-result.selected { background: var(--border); }
+
+.due-date { font-size: 0.75rem; padding: 1px 5px; border-radius: 3px; font-weight: 500; }
+.due-date.overdue { background: #fee2e2; color: #dc2626; }
+.due-date.due-soon { background: #fef3c7; color: #d97706; }

@@ -11,11 +11,13 @@ export default function Board({ sprintId, currentUser }) {
   const [tickets, setTickets] = useState([]);
   const [users, setUsers] = useState([]);
   const [selectedTicket, setSelectedTicket] = useState(null);
+  const [loaded, setLoaded] = useState(false);
 
   async function fetchTickets() {
     const res = await apiFetch(`/api/tickets?sprint_id=${sprintId}`);
     const data = await res.json();
     setTickets(data.tickets || []);
+    setLoaded(true);
   }
 
   useEffect(() => {
@@ -78,6 +80,11 @@ export default function Board({ sprintId, currentUser }) {
               onTicketView={(ticketId) => openTicket(ticketId)}
             />
           ))}
+          {loaded && !tickets.length && sprintId && (
+            <div className="empty" style={{ gridColumn: '1/-1', padding: '2rem', textAlign: 'center' }}>
+              No tickets in this sprint. Move tickets from the backlog or create new ones.
+            </div>
+          )}
         </div>
       </DndContext>
       {selectedTicket && (

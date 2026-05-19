@@ -164,7 +164,11 @@ export default function SprintView({ currentUser }) {
       {sortedSprints.map((sprint) => (
         <SprintCard key={sprint.id} sprint={sprint} isAdmin={isAdmin} onAction={handleAction} />
       ))}
-      {!sortedSprints.length && <div className="empty">No sprints</div>}
+      {sprints.length === 0 && (
+        <div className="empty">
+          No sprints yet. {isAdmin ? 'Create one with + New Sprint above.' : 'Ask an admin to create one.'}
+        </div>
+      )}
     </div>
   );
 }

@@ -92,7 +92,17 @@ export default function BacklogView() {
                 </tr>
               ))}
               {!tickets.length && (
-                <tr><td colSpan={6}><div className="empty">No tickets</div></td></tr>
+                <tr>
+                  <td colSpan={6}>
+                    <div className="empty">
+                      Your backlog is empty.{' '}
+                      <button type="button" className="btn btn-sm" onClick={() => setShowCreateForm(true)}>
+                        Create a ticket
+                      </button>
+                      {' '}to get started.
+                    </div>
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>

@@ -119,6 +119,13 @@ export default function TeamView({ currentUser }) {
           </tbody>
         </table>
       </div>
+      {users.length <= 1 && (
+        <div className="empty" style={{ marginTop: '1rem' }}>
+          {isAdmin
+            ? "You're the only user here. Add team members with + Add User above."
+            : "You're the only user here. Ask an admin to add team members."}
+        </div>
+      )}
     </div>
   );
 }
