@@ -404,3 +404,8 @@ tr:hover td { background: var(--bg-alt); }
   .detail-grid { grid-template-columns: 1fr; }
   .detail-sidebar { border-left: 0; padding-left: 0; border-top: 1px solid var(--border); padding-top: var(--space-xl); }
 }
+
+.navbar-search { background: var(--bg-secondary); border: 1px solid var(--border); color: var(--text); padding: 4px 8px; border-radius: 4px; width: 200px; font-size: 0.85rem; }
+.search-dropdown { position: absolute; top: calc(100% + 4px); left: 0; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 4px; z-index: 1000; max-height: 300px; overflow-y: auto; min-width: 360px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+.search-result { padding: 8px 12px; cursor: pointer; font-size: 0.875rem; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.search-result:hover, .search-result.selected { background: var(--border); }
