@@ -230,26 +230,26 @@ export default function BacklogView() {
               <button type="button" className="btn btn-sm" onClick={() => setSelected(new Set())}>Clear</button>
             </div>
           )}
-          <div className="table-container">
-            <table className="backlog-table">
-              <thead>
-                <tr>
-                  <th style={{ width: 36, textAlign: 'center' }}>
-                    <input
-                      type="checkbox"
-                      checked={tickets.length > 0 && selected.size === tickets.length}
-                      onChange={toggleSelectAll}
-                    />
-                  </th>
-                  <th style={{ width: 60 }}>#</th>
-                  <th className="backlog-title-col">Title</th>
-                  <th style={{ width: 90 }}>Priority</th>
-                  <th style={{ width: 100 }}>Assignee</th>
-                  <th style={{ width: 160 }}>Labels</th>
-                  <th style={{ width: 160 }}>Actions</th>
-                </tr>
-              </thead>
-              <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
+          <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
+            <div className="table-container">
+              <table className="backlog-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: 36, textAlign: 'center' }}>
+                      <input
+                        type="checkbox"
+                        checked={tickets.length > 0 && selected.size === tickets.length}
+                        onChange={toggleSelectAll}
+                      />
+                    </th>
+                    <th style={{ width: 60 }}>#</th>
+                    <th className="backlog-title-col">Title</th>
+                    <th style={{ width: 90 }}>Priority</th>
+                    <th style={{ width: 100 }}>Assignee</th>
+                    <th style={{ width: 160 }}>Labels</th>
+                    <th style={{ width: 160 }}>Actions</th>
+                  </tr>
+                </thead>
                 <SortableContext items={tickets.map((t) => t.id)} strategy={verticalListSortingStrategy}>
                   <tbody>
                     {tickets.map((ticket) => (
@@ -277,9 +277,9 @@ export default function BacklogView() {
                     )}
                   </tbody>
                 </SortableContext>
-              </DndContext>
-            </table>
-          </div>
+              </table>
+            </div>
+          </DndContext>
         </>
       )}
       {tickets.length < total && (
