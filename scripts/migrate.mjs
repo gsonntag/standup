@@ -190,5 +190,14 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_retro_notes_sprint ON retro_notes(sprint_id);
 `);
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS sprint_wip_limits (
+    sprint_id TEXT NOT NULL REFERENCES sprints(id) ON DELETE CASCADE,
+    status    TEXT NOT NULL,
+    max_count INTEGER NOT NULL,
+    PRIMARY KEY (sprint_id, status)
+  );
+`);
+
 console.log('Migrations complete. Database at:', DB_PATH);
 db.close();

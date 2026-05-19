@@ -76,6 +76,21 @@ export const GET = withAuth(async (request) => {
     where.push('t.assignee_id = ?');
     args.push(searchParams.get('assignee_id'));
   }
+  if (searchParams.has('priority')) {
+    where.push('t.priority = ?');
+    args.push(searchParams.get('priority'));
+  }
+  if (searchParams.has('q')) {
+    const q = searchParams.get('q');
+    where.push('(t.title LIKE ? OR CAST(t.number AS TEXT) = ?)');
+    args.push('%' + q + '%', q);
+  }
+  const labelIds = searchParams.getAll('label_id');
+  if (labelIds.length) {
+    const ph = labelIds.map(() => '?').join(',');
+    where.push(`t.id IN (SELECT ticket_id FROM ticket_labels WHERE label_id IN (${ph}) GROUP BY ticket_id HAVING COUNT(DISTINCT label_id) = ${labelIds.length})`);
+    args.push(...labelIds);
+  }
 
   const total = db.prepare(`
     SELECT COUNT(*) AS count

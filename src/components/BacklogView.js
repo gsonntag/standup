@@ -3,17 +3,28 @@
 import { DndContext, closestCorners, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { apiFetch } from '@/lib/client-api';
+import { PRIORITIES } from '@/lib/constants';
 import CreateTicketForm from './CreateTicketForm';
 import TicketDetail from './TicketDetail';
+import TicketFilterBar from './TicketFilterBar';
 
-function SortableRow({ ticket, movableSprints, onView, onMoveToSprint }) {
+function SortableRow({ ticket, movableSprints, onView, onMoveToSprint, selected, onToggleSelect }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: ticket.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
 
   return (
     <tr ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      <td onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} style={{ width: 36, textAlign: 'center' }}>
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={onToggleSelect}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        />
+      </td>
       <td className="text-mono text-muted">#{ticket.number}</td>
       <td className="backlog-title-cell">
         <button
@@ -56,18 +67,34 @@ export default function BacklogView() {
   const [offset, setOffset] = useState(0);
   const [users, setUsers] = useState([]);
   const [sprints, setSprints] = useState([]);
+  const [labels, setLabels] = useState([]);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedTicketId, setSelectedTicketId] = useState(null);
+  const [filters, setFilters] = useState({});
+  const [selected, setSelected] = useState(new Set());
+  const debounceTimer = useRef(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
-  async function fetchTickets(fetchOffset = 0) {
-    const res = await apiFetch(`/api/tickets?sprint_id=none&limit=50&offset=${fetchOffset}`);
+  function buildUrl(fetchOffset = 0, currentFilters = filters) {
+    const params = new URLSearchParams();
+    params.set('sprint_id', 'none');
+    params.set('limit', '50');
+    params.set('offset', String(fetchOffset));
+    if (currentFilters.q) params.set('q', currentFilters.q);
+    if (currentFilters.assignee_id) params.set('assignee_id', currentFilters.assignee_id);
+    if (currentFilters.priority) params.set('priority', currentFilters.priority);
+    return `/api/tickets?${params.toString()}`;
+  }
+
+  async function fetchTickets(fetchOffset = 0, currentFilters = filters) {
+    const res = await apiFetch(buildUrl(fetchOffset, currentFilters));
     const data = await res.json();
     if (fetchOffset > 0) {
       setTickets((prev) => [...prev, ...(data.tickets || [])]);
     } else {
       setTickets(data.tickets || []);
+      setSelected(new Set());
     }
     setTotal(data.total || 0);
   }
@@ -76,7 +103,17 @@ export default function BacklogView() {
     fetchTickets(0);
     apiFetch('/api/users').then((r) => r.json()).then((d) => setUsers(d.users || []));
     apiFetch('/api/sprints').then((r) => r.json()).then((d) => setSprints(d.sprints || []));
+    apiFetch('/api/labels').then((r) => r.json()).then((d) => setLabels(d.labels || []));
   }, []);
+
+  function handleFiltersChange(newFilters) {
+    setFilters(newFilters);
+    setOffset(0);
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => {
+      fetchTickets(0, newFilters);
+    }, 200);
+  }
 
   async function moveToSprint(ticketId, sprintId) {
     if (!sprintId) return;
@@ -113,6 +150,48 @@ export default function BacklogView() {
     }).catch(() => fetchTickets(0));
   }
 
+  function toggleSelectAll() {
+    if (selected.size === tickets.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(tickets.map((t) => t.id)));
+    }
+  }
+
+  function toggleSelect(id) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function handleBulkAction(type, value) {
+    if (!value) return;
+    const ids = [...selected];
+    if (type === 'sprint') {
+      await apiFetch('/api/tickets/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, set: { sprint_id: value, status: 'todo' } }),
+      });
+    }
+    setSelected(new Set());
+    fetchTickets(0);
+  }
+
+  async function handleBulkDelete() {
+    const ids = [...selected];
+    await apiFetch('/api/tickets/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids, delete: true }),
+    });
+    setSelected(new Set());
+    fetchTickets(0);
+  }
+
   const movableSprints = sprints.filter((sprint) => sprint.status === 'planning' || sprint.status === 'active');
 
   return (
@@ -132,48 +211,76 @@ export default function BacklogView() {
         />
       )}
       {!showCreateForm && (
-        <div className="table-container">
-          <table className="backlog-table">
-            <thead>
-              <tr>
-                <th style={{ width: 60 }}>#</th>
-                <th className="backlog-title-col">Title</th>
-                <th style={{ width: 90 }}>Priority</th>
-                <th style={{ width: 100 }}>Assignee</th>
-                <th style={{ width: 160 }}>Labels</th>
-                <th style={{ width: 160 }}>Actions</th>
-              </tr>
-            </thead>
-            <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
-              <SortableContext items={tickets.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-                <tbody>
-                  {tickets.map((ticket) => (
-                    <SortableRow
-                      key={ticket.id}
-                      ticket={ticket}
-                      movableSprints={movableSprints}
-                      onView={setSelectedTicketId}
-                      onMoveToSprint={moveToSprint}
+        <>
+          <TicketFilterBar
+            filters={filters}
+            onChange={handleFiltersChange}
+            users={users}
+            labels={labels}
+            priorities={PRIORITIES}
+          />
+          {selected.size > 0 && (
+            <div className="bulk-bar">
+              <span>{selected.size} selected</span>
+              <select onChange={(e) => handleBulkAction('sprint', e.target.value)} defaultValue="">
+                <option value="">Move to sprint…</option>
+                {movableSprints.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+              <button type="button" className="btn btn-sm" onClick={handleBulkDelete}>Delete</button>
+              <button type="button" className="btn btn-sm" onClick={() => setSelected(new Set())}>Clear</button>
+            </div>
+          )}
+          <div className="table-container">
+            <table className="backlog-table">
+              <thead>
+                <tr>
+                  <th style={{ width: 36, textAlign: 'center' }}>
+                    <input
+                      type="checkbox"
+                      checked={tickets.length > 0 && selected.size === tickets.length}
+                      onChange={toggleSelectAll}
                     />
-                  ))}
-                  {!tickets.length && (
-                    <tr>
-                      <td colSpan={6}>
-                        <div className="empty">
-                          Your backlog is empty.{' '}
-                          <button type="button" className="btn btn-sm" onClick={() => setShowCreateForm(true)}>
-                            Create a ticket
-                          </button>
-                          {' '}to get started.
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </SortableContext>
-            </DndContext>
-          </table>
-        </div>
+                  </th>
+                  <th style={{ width: 60 }}>#</th>
+                  <th className="backlog-title-col">Title</th>
+                  <th style={{ width: 90 }}>Priority</th>
+                  <th style={{ width: 100 }}>Assignee</th>
+                  <th style={{ width: 160 }}>Labels</th>
+                  <th style={{ width: 160 }}>Actions</th>
+                </tr>
+              </thead>
+              <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
+                <SortableContext items={tickets.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+                  <tbody>
+                    {tickets.map((ticket) => (
+                      <SortableRow
+                        key={ticket.id}
+                        ticket={ticket}
+                        movableSprints={movableSprints}
+                        onView={setSelectedTicketId}
+                        onMoveToSprint={moveToSprint}
+                        selected={selected.has(ticket.id)}
+                        onToggleSelect={() => toggleSelect(ticket.id)}
+                      />
+                    ))}
+                    {!tickets.length && (
+                      <tr>
+                        <td colSpan={7}>
+                          <div className="empty">
+                            {Object.values(filters).some(Boolean)
+                              ? 'No tickets match your filters.'
+                              : <>Your backlog is empty.{' '}<button type="button" className="btn btn-sm" onClick={() => setShowCreateForm(true)}>Create a ticket</button>{' '}to get started.</>
+                            }
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </SortableContext>
+              </DndContext>
+            </table>
+          </div>
+        </>
       )}
       {tickets.length < total && (
         <div style={{ textAlign: 'center', marginTop: '1rem' }}>

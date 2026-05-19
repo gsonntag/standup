@@ -423,3 +423,12 @@ tr:hover td { background: var(--bg-alt); }
 .retro-note-content { flex: 1; }
 .retro-add { display: flex; flex-direction: column; gap: 0.5rem; }
 .retro-add textarea { width: 100%; }
+
+.board-column-header.over-limit { color: #dc2626; }
+
+.filter-bar { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; }
+.filter-input { padding: 4px 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-secondary); color: var(--text); }
+.bulk-bar { display: flex; gap: 0.75rem; align-items: center; padding: 0.75rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 1rem; }
+
+.swimlanes { display: flex; flex-direction: column; gap: 1.5rem; }
+.swimlane-label { font-weight: 600; font-size: 0.85rem; padding: 0.25rem 0; margin-bottom: 0.25rem; border-bottom: 1px solid var(--border); color: var(--text-muted); }

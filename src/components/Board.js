@@ -8,6 +8,7 @@ import { STATUSES } from '@/lib/constants';
 import BoardColumn from './BoardColumn';
 import TicketCard from './TicketCard';
 import TicketDetail from './TicketDetail';
+import { useToast, ToastContainer } from './Toast';
 
 export default function Board({ sprintId, currentUser }) {
   const [tickets, setTickets] = useState([]);
@@ -15,6 +16,11 @@ export default function Board({ sprintId, currentUser }) {
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [loaded, setLoaded] = useState(false);
   const [activeTicket, setActiveTicket] = useState(null);
+  const [wipLimits, setWipLimits] = useState({});
+  const [swimlane, setSwimlane] = useState('none');
+  const [showWipSettings, setShowWipSettings] = useState(false);
+  const [wipDraft, setWipDraft] = useState({});
+  const { toasts, addToast } = useToast();
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
@@ -25,9 +31,27 @@ export default function Board({ sprintId, currentUser }) {
     setLoaded(true);
   }
 
+  async function fetchWipLimits() {
+    if (!sprintId) return;
+    const res = await apiFetch(`/api/sprints/${sprintId}/wip`);
+    const data = await res.json();
+    const limitsMap = {};
+    for (const { status, max_count } of (data.limits || [])) {
+      limitsMap[status] = max_count;
+    }
+    setWipLimits(limitsMap);
+    // Initialize wip draft from current limits
+    const draft = {};
+    for (const s of STATUSES) {
+      draft[s.value] = limitsMap[s.value] || 0;
+    }
+    setWipDraft(draft);
+  }
+
   useEffect(() => {
     fetchTickets();
     apiFetch('/api/users').then((res) => res.json()).then((data) => setUsers(data.users || []));
+    fetchWipLimits();
   }, [sprintId]);
 
   function handleDragStart(event) {
@@ -46,15 +70,30 @@ export default function Board({ sprintId, currentUser }) {
 
     const statusValues = new Set(STATUSES.map((s) => s.value));
 
-    // Determine target status: over.id could be a status column or another ticket id
+    // Parse lane-prefixed droppable ids (e.g. "laneKey__status")
+    function parseOverId(id) {
+      if (typeof id === 'string' && id.includes('__')) {
+        const idx = id.indexOf('__');
+        return { laneKey: id.substring(0, idx), statusValue: id.substring(idx + 2) };
+      }
+      return { laneKey: null, statusValue: id };
+    }
+
     let newStatus;
     let beforeId = null;
+    let newLaneKey = null;
+    let newLaneField = null;
 
-    if (statusValues.has(over.id)) {
-      // Dropped onto a column droppable
-      newStatus = over.id;
+    const overIdStr = String(over.id);
+    if (overIdStr.includes('__')) {
+      // Dropped onto a lane column droppable
+      const parsed = parseOverId(overIdStr);
+      newStatus = parsed.statusValue;
+      newLaneKey = parsed.laneKey;
+    } else if (statusValues.has(overIdStr)) {
+      newStatus = overIdStr;
     } else {
-      // Dropped onto another ticket — find that ticket's status
+      // Dropped onto another ticket
       const overTicket = tickets.find((t) => t.id === over.id);
       if (!overTicket) return;
       newStatus = overTicket.status;
@@ -63,11 +102,22 @@ export default function Board({ sprintId, currentUser }) {
 
     const isSameColumn = current.status === newStatus;
 
-    if (isSameColumn && !beforeId) return; // no-op drop on same column header
+    if (isSameColumn && !beforeId && !newLaneKey) return;
+
+    // Determine lane field update
+    if (swimlane === 'assignee' && newLaneKey !== null) {
+      newLaneField = { assignee_id: newLaneKey === 'unassigned' ? null : newLaneKey };
+    } else if (swimlane === 'priority' && newLaneKey !== null) {
+      newLaneField = { priority: newLaneKey };
+    }
+
+    // Snapshot for rollback
+    const prevTickets = tickets;
 
     // Optimistic update
     setTickets((prev) => {
-      if (isSameColumn) {
+      const updatedFields = { status: newStatus, ...(newLaneField || {}) };
+      if (isSameColumn && !newLaneField) {
         // Reorder within column
         const colTickets = prev.filter((t) => t.status === newStatus).sort((a, b) => a.sort_order - b.sort_order || new Date(b.created_at) - new Date(a.created_at));
         const oldIdx = colTickets.findIndex((t) => t.id === ticketId);
@@ -80,21 +130,32 @@ export default function Board({ sprintId, currentUser }) {
           ...reordered.map((t, i) => ({ ...t, sort_order: (i + 1) * 1024 })),
         ];
       } else {
-        return prev.map((t) => t.id === ticketId ? { ...t, status: newStatus } : t);
+        return prev.map((t) => t.id === ticketId ? { ...t, ...updatedFields } : t);
       }
     });
 
-    const patchBody = isSameColumn
+    const patchBody = isSameColumn && !newLaneField
       ? { position: { before_id: beforeId } }
-      : { status: newStatus, position: { before_id: beforeId } };
+      : { status: newStatus, position: { before_id: beforeId }, ...(newLaneField || {}) };
 
     apiFetch(`/api/tickets/${ticketId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(patchBody),
-    }).then((res) => {
-      if (!res.ok) fetchTickets();
-    }).catch(fetchTickets);
+    }).then(async (res) => {
+      if (!res.ok) {
+        let errMsg = 'Server rejected the change';
+        try {
+          const data = await res.json();
+          if (data.error) errMsg = data.error;
+        } catch (_) {}
+        addToast(`Failed to move ticket: ${errMsg}`);
+        setTickets(prevTickets);
+      }
+    }).catch((err) => {
+      addToast(`Failed to move ticket: ${err.message || 'Network error'}`);
+      setTickets(prevTickets);
+    });
   }
 
   function openTicket(ticketId, editing = false) {
@@ -116,27 +177,154 @@ export default function Board({ sprintId, currentUser }) {
     if (!res.ok) fetchTickets();
   }
 
+  async function saveWipLimits() {
+    const limits = Object.entries(wipDraft)
+      .filter(([, v]) => v > 0)
+      .map(([status, max_count]) => ({ status, max_count: Number(max_count) }));
+    const res = await apiFetch(`/api/sprints/${sprintId}/wip`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ limits }),
+    });
+    if (res.ok) {
+      const newLimits = {};
+      for (const { status, max_count } of limits) {
+        newLimits[status] = max_count;
+      }
+      setWipLimits(newLimits);
+      setShowWipSettings(false);
+      addToast('WIP limits saved.', 'success');
+    } else {
+      addToast('Failed to save WIP limits.');
+    }
+  }
+
+  // Build swimlane groups
+  function buildLanes() {
+    if (swimlane === 'assignee') {
+      const groups = new Map();
+      for (const t of tickets) {
+        const key = t.assignee_id || 'unassigned';
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(t);
+      }
+      const lanes = [];
+      for (const [key, laneTickets] of groups) {
+        const user = users.find((u) => u.id === key);
+        lanes.push({
+          key,
+          label: user ? user.username : 'Unassigned',
+          tickets: laneTickets,
+        });
+      }
+      return lanes;
+    } else if (swimlane === 'priority') {
+      const groups = new Map();
+      for (const t of tickets) {
+        const key = t.priority || 'medium';
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(t);
+      }
+      const lanes = [];
+      for (const [key, laneTickets] of groups) {
+        lanes.push({ key, label: key.charAt(0).toUpperCase() + key.slice(1), tickets: laneTickets });
+      }
+      return lanes;
+    }
+    return [];
+  }
+
+  const lanes = swimlane !== 'none' ? buildLanes() : [];
+
   return (
     <>
-      <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <div className="board">
-          {STATUSES.map((status) => (
-            <BoardColumn
-              key={status.value}
-              currentUser={currentUser}
-              status={status}
-              tickets={tickets.filter((ticket) => ticket.status === status.value).sort((a, b) => a.sort_order - b.sort_order || new Date(b.created_at) - new Date(a.created_at))}
-              users={users}
-              onTicketAssign={assignTicket}
-              onTicketView={(ticketId) => openTicket(ticketId)}
-            />
+      <div className="board-toolbar" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
+        <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+          Swimlanes:&nbsp;
+          <select value={swimlane} onChange={(e) => setSwimlane(e.target.value)} style={{ fontSize: '0.8rem' }}>
+            <option value="none">None</option>
+            <option value="assignee">Assignee</option>
+            <option value="priority">Priority</option>
+          </select>
+        </label>
+        {currentUser?.role === 'admin' && sprintId && (
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={() => setShowWipSettings((v) => !v)}
+            title="WIP Limit Settings"
+            style={{ fontSize: '0.8rem' }}
+          >
+            ⚙ WIP Limits
+          </button>
+        )}
+      </div>
+
+      {showWipSettings && (
+        <div className="wip-settings-panel" style={{ background: 'var(--bg-secondary, #f5f5f5)', border: '1px solid var(--border)', borderRadius: '6px', padding: '0.75rem 1rem', marginBottom: '0.75rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          {STATUSES.map((s) => (
+            <label key={s.value} style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '0.8rem' }}>
+              {s.label}
+              <input
+                type="number"
+                min="0"
+                style={{ width: '60px', padding: '2px 4px', fontSize: '0.8rem' }}
+                value={wipDraft[s.value] || 0}
+                onChange={(e) => setWipDraft((prev) => ({ ...prev, [s.value]: Number(e.target.value) }))}
+              />
+            </label>
           ))}
-          {loaded && !tickets.length && sprintId && (
-            <div className="empty" style={{ gridColumn: '1/-1', padding: '2rem', textAlign: 'center' }}>
-              No tickets in this sprint. Move tickets from the backlog or create new ones.
-            </div>
-          )}
+          <button type="button" className="btn btn-sm" onClick={saveWipLimits}>Save</button>
+          <button type="button" className="btn btn-sm" onClick={() => setShowWipSettings(false)}>Cancel</button>
         </div>
+      )}
+
+      <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+        {swimlane !== 'none' ? (
+          <div className="swimlanes">
+            {lanes.map((lane) => (
+              <div key={lane.key} className="swimlane">
+                <div className="swimlane-label">{lane.label}</div>
+                <div className="board">
+                  {STATUSES.map((status) => (
+                    <BoardColumn
+                      key={`${lane.key}-${status.value}`}
+                      currentUser={currentUser}
+                      status={{ ...status, value: `${lane.key}__${status.value}` }}
+                      tickets={lane.tickets.filter((t) => t.status === status.value).sort((a, b) => a.sort_order - b.sort_order || new Date(b.created_at) - new Date(a.created_at))}
+                      users={users}
+                      onTicketAssign={assignTicket}
+                      onTicketView={(ticketId) => openTicket(ticketId)}
+                      wipLimit={wipLimits[status.value]}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <>
+            <div className="board">
+              {STATUSES.map((status) => (
+                <BoardColumn
+                  key={status.value}
+                  currentUser={currentUser}
+                  status={status}
+                  tickets={tickets.filter((ticket) => ticket.status === status.value).sort((a, b) => a.sort_order - b.sort_order || new Date(b.created_at) - new Date(a.created_at))}
+                  users={users}
+                  onTicketAssign={assignTicket}
+                  onTicketView={(ticketId) => openTicket(ticketId)}
+                  wipLimit={wipLimits[status.value]}
+                />
+              ))}
+            </div>
+            {loaded && !tickets.length && sprintId && (
+              <div className="empty" style={{ gridColumn: '1/-1', padding: '2rem', textAlign: 'center' }}>
+                No tickets in this sprint. Move tickets from the backlog or create new ones.
+              </div>
+            )}
+          </>
+        )}
         <DragOverlay>
           {activeTicket ? (
             <TicketCard
@@ -158,6 +346,7 @@ export default function Board({ sprintId, currentUser }) {
           }}
         />
       )}
+      <ToastContainer toasts={toasts} />
     </>
   );
 }
