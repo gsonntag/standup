@@ -59,8 +59,10 @@ db.exec(`
     sprint_id   TEXT REFERENCES sprints(id) ON DELETE SET NULL,
     assignee_id TEXT REFERENCES users(id) ON DELETE SET NULL,
     creator_id  TEXT NOT NULL REFERENCES users(id),
-    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    total_points     INTEGER,
+    points_remaining INTEGER,
+    created_at       TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at       TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
   CREATE TABLE IF NOT EXISTS ticket_labels (
@@ -147,13 +149,25 @@ db.exec(`
   END;
 `);
 
-// Due date and story points columns
+// Due date and points columns
 const ticketCols = db.prepare('PRAGMA table_info(tickets)').all().map(c => c.name);
 if (!ticketCols.includes('due_date')) {
   db.exec('ALTER TABLE tickets ADD COLUMN due_date TEXT');
 }
 if (!ticketCols.includes('story_points')) {
   db.exec('ALTER TABLE tickets ADD COLUMN story_points INTEGER');
+}
+if (!ticketCols.includes('total_points')) {
+  db.exec('ALTER TABLE tickets ADD COLUMN total_points INTEGER');
+  db.prepare('UPDATE tickets SET total_points = story_points WHERE story_points IS NOT NULL AND total_points IS NULL').run();
+}
+if (!ticketCols.includes('points_remaining')) {
+  db.exec('ALTER TABLE tickets ADD COLUMN points_remaining INTEGER');
+  db.prepare(`
+    UPDATE tickets
+    SET points_remaining = CASE WHEN status = 'done' THEN 0 ELSE story_points END
+    WHERE story_points IS NOT NULL AND points_remaining IS NULL
+  `).run();
 }
 
 // Attachments and watchers tables
@@ -210,6 +224,11 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_mentions_user ON mentions(user_id, acknowledged);
 `);
+
+const userColumns = db.prepare('PRAGMA table_info(users)').all().map(c => c.name);
+if (!userColumns.includes('discord_id')) {
+  db.exec('ALTER TABLE users ADD COLUMN discord_id TEXT');
+}
 
 console.log('Migrations complete. Database at:', DB_PATH);
 db.close();

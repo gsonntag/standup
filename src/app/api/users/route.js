@@ -7,7 +7,7 @@ import { getDb } from '@/lib/db';
 
 export const GET = withAuth(async () => {
   const users = getDb().prepare(
-    'SELECT id, username, role, created_at FROM users ORDER BY username ASC'
+    'SELECT id, username, role, discord_id, created_at FROM users ORDER BY username ASC'
   ).all();
   return NextResponse.json({ users });
 });

@@ -111,6 +111,12 @@ label {
 .btn-danger { color: var(--danger); border-color: var(--danger); }
 .btn-danger:hover { background: #fff0f0; }
 .btn-sm { font-size: var(--font-size-sm); padding: var(--space-xs) var(--space-md); }
+.btn-active { background: var(--text); color: var(--bg); border-color: var(--text); }
+.btn-active:hover { background: #333333; }
+.btn-group { display: flex; }
+.btn-group .btn { border-radius: 0; }
+.btn-group .btn:first-child { border-radius: 4px 0 0 4px; }
+.btn-group .btn:last-child { border-radius: 0 4px 4px 0; border-left: none; }
 
 .navbar {
   display: flex;
@@ -126,7 +132,7 @@ label {
   color: var(--text);
   text-decoration: none;
   margin-right: var(--space-2xl);
-  text-transform: lowercase;
+  text-transform: none;
 }
 .navbar-brand:hover { color: var(--text); text-decoration: none; }
 .navbar-links { display: flex; gap: 0; list-style: none; height: 100%; }
@@ -327,8 +333,8 @@ td { padding: var(--space-md) var(--space-lg); border-bottom: 1px solid var(--bo
 tr:last-child td { border-bottom: none; }
 tr:hover td { background: var(--bg-alt); }
 .role-select { width: 110px; }
-.backlog-table { table-layout: fixed; min-width: 1120px; }
-.backlog-title-col { width: 610px; }
+.backlog-table { table-layout: fixed; min-width: 960px; }
+.backlog-title-col { width: 360px; }
 .backlog-title-cell { width: 100%; }
 .backlog-title-button {
   display: block;

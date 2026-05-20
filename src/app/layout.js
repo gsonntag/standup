@@ -3,7 +3,7 @@ import { getCurrentUser } from '@/lib/auth';
 import Navbar from '@/components/Navbar';
 
 export const metadata = {
-  title: 'scrum',
+  title: 'Standup',
   description: 'Sprint planning tool',
 };
 

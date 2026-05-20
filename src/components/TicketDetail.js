@@ -36,7 +36,8 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
   const [isEditing, setIsEditing] = useState(initialEditing);
   const [showDependencyPicker, setShowDependencyPicker] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
-  const [storyPointsInput, setStoryPointsInput] = useState('');
+  const [totalPointsInput, setTotalPointsInput] = useState('');
+  const [pointsRemainingInput, setPointsRemainingInput] = useState('');
   const attachFileRef = useRef(null);
   const [attachUploading, setAttachUploading] = useState(false);
 
@@ -48,7 +49,8 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
       setTitle(data.ticket.title);
       setDescription(data.ticket.description);
       setEvents(data.ticket.events || []);
-      setStoryPointsInput(data.ticket.story_points != null ? String(data.ticket.story_points) : '');
+      setTotalPointsInput(data.ticket.total_points != null ? String(data.ticket.total_points) : '');
+      setPointsRemainingInput(data.ticket.points_remaining != null ? String(data.ticket.points_remaining) : '');
     }
   }
 
@@ -218,6 +220,17 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   }
 
+  function resolveEventValue(field, value) {
+    if (!value) return '(none)';
+    if (field === 'assignee') {
+      return users.find((u) => u.id === value)?.username || value;
+    }
+    if (field === 'sprint') {
+      return sprints.find((s) => s.id === value)?.name || value;
+    }
+    return value;
+  }
+
   if (!ticket) {
     return (
       <div className="modal-overlay" onClick={() => onClose()}>
@@ -294,7 +307,7 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
                     return (
                       <div className="event-row" key={item.id}>
                         <span className="text-muted">
-                          {item.actor_username} changed {item.field}: {item.old_value || '(none)'} → {item.new_value || '(none)'}
+                          {item.actor_username} changed {item.field}: {resolveEventValue(item.field, item.old_value)} → {resolveEventValue(item.field, item.new_value)}
                         </span>
                         <span className="text-muted comment-date">{timeAgo(item.created_at)}</span>
                       </div>
@@ -349,18 +362,35 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
                 )}
               </div>
               <div className="detail-field">
-                <div className="detail-field-label">Points</div>
+                <div className="detail-field-label">Total Points</div>
                 <input
                   type="number"
                   min="1"
                   style={{ width: '80px' }}
-                  value={storyPointsInput}
-                  onChange={(e) => setStoryPointsInput(e.target.value)}
+                  value={totalPointsInput}
+                  onChange={(e) => setTotalPointsInput(e.target.value)}
                   onBlur={() => {
-                    const val = storyPointsInput === '' ? null : parseInt(storyPointsInput, 10);
-                    if (storyPointsInput !== '' && (isNaN(val) || val < 1)) return;
-                    const current = ticket.story_points ?? null;
-                    if (val !== current) updateField('story_points', val);
+                    const val = totalPointsInput === '' ? null : parseInt(totalPointsInput, 10);
+                    if (totalPointsInput !== '' && (isNaN(val) || val < 1)) return;
+                    const current = ticket.total_points ?? null;
+                    if (val !== current) updateField('total_points', val);
+                  }}
+                  placeholder="—"
+                />
+              </div>
+              <div className="detail-field">
+                <div className="detail-field-label">Points Remaining</div>
+                <input
+                  type="number"
+                  min="0"
+                  style={{ width: '80px' }}
+                  value={pointsRemainingInput}
+                  onChange={(e) => setPointsRemainingInput(e.target.value)}
+                  onBlur={() => {
+                    const val = pointsRemainingInput === '' ? null : parseInt(pointsRemainingInput, 10);
+                    if (pointsRemainingInput !== '' && (isNaN(val) || val < 0)) return;
+                    const current = ticket.points_remaining ?? null;
+                    if (val !== current) updateField('points_remaining', val);
                   }}
                   placeholder="—"
                 />
@@ -386,16 +416,12 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
               </div>
               <div className="detail-field">
                 <div className="detail-field-label">Sprint</div>
-                {isEditing ? (
-                  <select id="detail-sprint" value={ticket.sprint_id || ''} onChange={(e) => updateField('sprint_id', e.target.value)}>
-                    <option value="">No sprint (backlog)</option>
-                    {sprints.filter((sprint) => sprint.status !== 'completed').map((sprint) => (
-                      <option key={sprint.id} value={sprint.id}>{sprint.name}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <div className="detail-value">{sprintName}</div>
-                )}
+                <select id="detail-sprint" value={ticket.sprint_id || ''} onChange={(e) => updateField('sprint_id', e.target.value)}>
+                  <option value="">Backlog</option>
+                  {sprints.filter((sprint) => sprint.status !== 'completed').map((sprint) => (
+                    <option key={sprint.id} value={sprint.id}>{sprint.name}</option>
+                  ))}
+                </select>
               </div>
               <div className="detail-field">
                 <div className="detail-field-label">Labels</div>

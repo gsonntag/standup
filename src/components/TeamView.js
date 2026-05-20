@@ -9,6 +9,8 @@ export default function TeamView({ currentUser }) {
   const [showForm, setShowForm] = useState(false);
   const [updatingUserId, setUpdatingUserId] = useState(null);
   const [error, setError] = useState('');
+  const [editingDiscord, setEditingDiscord] = useState(null);
+  const [discordInput, setDiscordInput] = useState('');
 
   async function fetchUsers() {
     const res = await apiFetch('/api/users');
@@ -39,12 +41,34 @@ export default function TeamView({ currentUser }) {
     setUsers((prev) => prev.map((user) => user.id === userId ? data.user : user));
   }
 
+  function startEditDiscord(user) {
+    setEditingDiscord(user.id);
+    setDiscordInput(user.discord_id || '');
+  }
+
+  async function saveDiscord(userId) {
+    setError('');
+    const res = await apiFetch(`/api/users/${userId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ discord_id: discordInput }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setError(data.error || 'Failed to update Discord ID.');
+      return;
+    }
+    setUsers((prev) => prev.map((u) => u.id === userId ? data.user : u));
+    setEditingDiscord(null);
+  }
+
   async function deleteUser(user) {
     if (!window.confirm(`Delete ${user.username}?`)) return;
     setError('');
     setUpdatingUserId(user.id);
     const res = await apiFetch(`/api/users/${user.id}`, { method: 'DELETE' });
-    const data = await res.json();
+    let data = {};
+    try { data = await res.json(); } catch (_) {}
     setUpdatingUserId(null);
     if (!res.ok) {
       setError(data.error || 'Failed to delete user.');
@@ -52,6 +76,8 @@ export default function TeamView({ currentUser }) {
     }
     setUsers((prev) => prev.filter((existing) => existing.id !== user.id));
   }
+
+  const colCount = isAdmin ? 5 : 4;
 
   return (
     <div className="page">
@@ -75,47 +101,79 @@ export default function TeamView({ currentUser }) {
             <tr>
               <th>Username</th>
               <th>Role</th>
+              <th>Discord</th>
               <th>Joined</th>
               {isAdmin && <th>Actions</th>}
             </tr>
           </thead>
           <tbody>
-            {users.map((user) => (
-              <tr key={user.id}>
-                <td className="font-bold">{user.username}</td>
-                <td className="text-muted">
-                  {isAdmin && user.id !== currentUser?.id ? (
-                    <select
-                      className="role-select"
-                      value={user.role}
-                      disabled={updatingUserId === user.id}
-                      onChange={(e) => updateRole(user.id, e.target.value)}
-                    >
-                      <option value="member">member</option>
-                      <option value="admin">admin</option>
-                    </select>
-                  ) : (
-                    user.role
-                  )}
-                </td>
-                <td className="text-muted text-sm">{user.created_at?.split(' ')[0]?.split('T')[0]}</td>
-                {isAdmin && (
-                  <td>
-                    {user.id !== currentUser?.id && (
-                      <button
-                        type="button"
-                        className="btn btn-danger btn-sm"
+            {users.map((user) => {
+              const canEditDiscord = isAdmin || user.id === currentUser?.id;
+              return (
+                <tr key={user.id}>
+                  <td className="font-bold">{user.username}</td>
+                  <td className="text-muted">
+                    {isAdmin && user.id !== currentUser?.id ? (
+                      <select
+                        className="role-select"
+                        value={user.role}
                         disabled={updatingUserId === user.id}
-                        onClick={() => deleteUser(user)}
+                        onChange={(e) => updateRole(user.id, e.target.value)}
                       >
-                        Delete
-                      </button>
+                        <option value="member">member</option>
+                        <option value="admin">admin</option>
+                      </select>
+                    ) : (
+                      user.role
                     )}
                   </td>
-                )}
-              </tr>
-            ))}
-            {!users.length && <tr><td colSpan={isAdmin ? 4 : 3}><div className="empty">No users</div></td></tr>}
+                  <td>
+                    {editingDiscord === user.id ? (
+                      <span className="flex gap-sm" style={{ alignItems: 'center' }}>
+                        <input
+                          style={{ width: '140px' }}
+                          value={discordInput}
+                          onChange={(e) => setDiscordInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') saveDiscord(user.id);
+                            if (e.key === 'Escape') setEditingDiscord(null);
+                          }}
+                          autoFocus
+                          placeholder="username"
+                        />
+                        <button type="button" className="btn btn-sm btn-primary" onClick={() => saveDiscord(user.id)}>Save</button>
+                        <button type="button" className="btn btn-sm" onClick={() => setEditingDiscord(null)}>Cancel</button>
+                      </span>
+                    ) : (
+                      <span className="flex gap-sm" style={{ alignItems: 'center' }}>
+                        <span className="text-muted text-sm">{user.discord_id || <em>not set</em>}</span>
+                        {canEditDiscord && (
+                          <button type="button" className="btn btn-sm" onClick={() => startEditDiscord(user)}>
+                            {user.discord_id ? 'Edit' : 'Set'}
+                          </button>
+                        )}
+                      </span>
+                    )}
+                  </td>
+                  <td className="text-muted text-sm">{user.created_at?.split(' ')[0]?.split('T')[0]}</td>
+                  {isAdmin && (
+                    <td>
+                      {user.id !== currentUser?.id && (
+                        <button
+                          type="button"
+                          className="btn btn-danger btn-sm"
+                          disabled={updatingUserId === user.id}
+                          onClick={() => deleteUser(user)}
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
+            {!users.length && <tr><td colSpan={colCount}><div className="empty">No users</div></td></tr>}
           </tbody>
         </table>
       </div>

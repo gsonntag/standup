@@ -40,7 +40,7 @@ export default function LoginPage() {
   return (
     <div className="login-container">
       <div className="login-box">
-        <h1>scrum</h1>
+        <h1>Standup</h1>
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label htmlFor="username">Username</label>

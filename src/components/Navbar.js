@@ -80,7 +80,7 @@ export default function Navbar({ user }) {
 
   function openResult(result) {
     setQuery(''); setResults([]); setShowDropdown(false);
-    router.push('/backlog');
+    router.push(`/backlog?ticket=${result.id}`);
   }
 
   async function handleLogout() {
@@ -91,7 +91,7 @@ export default function Navbar({ user }) {
 
   return (
     <nav className="navbar">
-      <a href="/" className="navbar-brand">scrum</a>
+      <a href="/" className="navbar-brand">Standup</a>
       <ul className="navbar-links">
         {NAV_LINKS.map((link) => (
           <li key={link.href}>

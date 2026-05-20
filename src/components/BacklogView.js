@@ -4,13 +4,14 @@ import { DndContext, closestCorners, PointerSensor, useSensor, useSensors } from
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { apiFetch } from '@/lib/client-api';
 import { PRIORITIES } from '@/lib/constants';
 import CreateTicketForm from './CreateTicketForm';
 import TicketDetail from './TicketDetail';
 import TicketFilterBar from './TicketFilterBar';
 
-function SortableRow({ ticket, movableSprints, onView, onMoveToSprint, selected, onToggleSelect }) {
+function SortableRow({ ticket, movableSprints, allSprints, onView, onMoveToSprint, selected, onToggleSelect, showSprint }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: ticket.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
 
@@ -25,7 +26,6 @@ function SortableRow({ ticket, movableSprints, onView, onMoveToSprint, selected,
           onClick={(e) => e.stopPropagation()}
         />
       </td>
-      <td className="text-mono text-muted">#{ticket.number}</td>
       <td className="backlog-title-cell">
         <button
           type="button"
@@ -45,6 +45,11 @@ function SortableRow({ ticket, movableSprints, onView, onMoveToSprint, selected,
           ))}
         </span>
       </td>
+      {showSprint && (
+        <td className="text-muted" style={{ fontSize: '0.8125rem' }}>
+          {ticket.sprint_id ? (allSprints.find((s) => s.id === ticket.sprint_id)?.name || '—') : <em>Backlog</em>}
+        </td>
+      )}
       <td>
         <select
           defaultValue=""
@@ -53,8 +58,9 @@ function SortableRow({ ticket, movableSprints, onView, onMoveToSprint, selected,
           onClick={(e) => e.stopPropagation()}
           onChange={(e) => onMoveToSprint(ticket.id, e.target.value)}
         >
-          <option value="">move to sprint</option>
-          {movableSprints.map((sprint) => <option key={sprint.id} value={sprint.id}>{sprint.name}</option>)}
+          <option value="">{ticket.sprint_id ? 'move to…' : 'move to sprint'}</option>
+          {ticket.sprint_id && <option value="backlog">Backlog</option>}
+          {movableSprints.filter((s) => s.id !== ticket.sprint_id).map((sprint) => <option key={sprint.id} value={sprint.id}>{sprint.name}</option>)}
         </select>
       </td>
     </tr>
@@ -62,6 +68,7 @@ function SortableRow({ ticket, movableSprints, onView, onMoveToSprint, selected,
 }
 
 export default function BacklogView() {
+  const searchParams = useSearchParams();
   const [tickets, setTickets] = useState([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
@@ -71,14 +78,15 @@ export default function BacklogView() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedTicketId, setSelectedTicketId] = useState(null);
   const [filters, setFilters] = useState({});
+  const [scope, setScope] = useState('all');
   const [selected, setSelected] = useState(new Set());
   const debounceTimer = useRef(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
-  function buildUrl(fetchOffset = 0, currentFilters = filters) {
+  function buildUrl(fetchOffset = 0, currentFilters = filters, currentScope = scope) {
     const params = new URLSearchParams();
-    params.set('sprint_id', 'none');
+    if (currentScope === 'backlog') params.set('sprint_id', 'none');
     params.set('limit', '50');
     params.set('offset', String(fetchOffset));
     if (currentFilters.q) params.set('q', currentFilters.q);
@@ -87,8 +95,8 @@ export default function BacklogView() {
     return `/api/tickets?${params.toString()}`;
   }
 
-  async function fetchTickets(fetchOffset = 0, currentFilters = filters) {
-    const res = await apiFetch(buildUrl(fetchOffset, currentFilters));
+  async function fetchTickets(fetchOffset = 0, currentFilters = filters, currentScope = scope) {
+    const res = await apiFetch(buildUrl(fetchOffset, currentFilters, currentScope));
     const data = await res.json();
     if (fetchOffset > 0) {
       setTickets((prev) => [...prev, ...(data.tickets || [])]);
@@ -100,6 +108,8 @@ export default function BacklogView() {
   }
 
   useEffect(() => {
+    const ticketParam = searchParams.get('ticket');
+    if (ticketParam) setSelectedTicketId(parseInt(ticketParam, 10));
     fetchTickets(0);
     apiFetch('/api/users').then((r) => r.json()).then((d) => setUsers(d.users || []));
     apiFetch('/api/sprints').then((r) => r.json()).then((d) => setSprints(d.sprints || []));
@@ -111,18 +121,31 @@ export default function BacklogView() {
     setOffset(0);
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     debounceTimer.current = setTimeout(() => {
-      fetchTickets(0, newFilters);
+      fetchTickets(0, newFilters, scope);
     }, 200);
+  }
+
+  function handleScopeChange(newScope) {
+    setScope(newScope);
+    setOffset(0);
+    setSelected(new Set());
+    fetchTickets(0, filters, newScope);
   }
 
   async function moveToSprint(ticketId, sprintId) {
     if (!sprintId) return;
-    setTickets((prev) => prev.filter((ticket) => ticket.id !== ticketId));
-    setTotal((prev) => Math.max(0, prev - 1));
+    if (scope === 'backlog') {
+      setTickets((prev) => prev.filter((ticket) => ticket.id !== ticketId));
+      setTotal((prev) => Math.max(0, prev - 1));
+    } else {
+      const newSprintId = sprintId === 'backlog' ? null : sprintId;
+      setTickets((prev) => prev.map((t) => t.id === ticketId ? { ...t, sprint_id: newSprintId } : t));
+    }
+    const newSprintId = sprintId === 'backlog' ? null : sprintId;
     await apiFetch(`/api/tickets/${ticketId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sprint_id: sprintId, status: 'todo' }),
+      body: JSON.stringify({ sprint_id: newSprintId, status: newSprintId ? 'todo' : 'backlog' }),
     });
   }
 
@@ -194,11 +217,19 @@ export default function BacklogView() {
 
   const movableSprints = sprints.filter((sprint) => sprint.status === 'planning' || sprint.status === 'active');
 
+  const showSprint = scope === 'all';
+
   return (
     <div className="page">
       <div className="page-header">
-        <h1>Backlog</h1>
-        <button className="btn btn-sm" onClick={() => setShowCreateForm(true)}>+ New Ticket</button>
+        <h1>{scope === 'all' ? 'Tickets' : 'Backlog'}</h1>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <div className="btn-group">
+            <button type="button" className={`btn btn-sm${scope === 'all' ? ' btn-active' : ''}`} onClick={() => handleScopeChange('all')}>All</button>
+            <button type="button" className={`btn btn-sm${scope === 'backlog' ? ' btn-active' : ''}`} onClick={() => handleScopeChange('backlog')}>Backlog only</button>
+          </div>
+          <button className="btn btn-sm" onClick={() => setShowCreateForm(true)}>+ New Ticket</button>
+        </div>
       </div>
       {showCreateForm && (
         <CreateTicketForm
@@ -242,11 +273,11 @@ export default function BacklogView() {
                         onChange={toggleSelectAll}
                       />
                     </th>
-                    <th style={{ width: 60 }}>#</th>
                     <th className="backlog-title-col">Title</th>
                     <th style={{ width: 90 }}>Priority</th>
                     <th style={{ width: 100 }}>Assignee</th>
                     <th style={{ width: 160 }}>Labels</th>
+                    {showSprint && <th style={{ width: 140 }}>Sprint</th>}
                     <th style={{ width: 160 }}>Actions</th>
                   </tr>
                 </thead>
@@ -257,19 +288,23 @@ export default function BacklogView() {
                         key={ticket.id}
                         ticket={ticket}
                         movableSprints={movableSprints}
+                        allSprints={sprints}
                         onView={setSelectedTicketId}
                         onMoveToSprint={moveToSprint}
                         selected={selected.has(ticket.id)}
                         onToggleSelect={() => toggleSelect(ticket.id)}
+                        showSprint={showSprint}
                       />
                     ))}
                     {!tickets.length && (
                       <tr>
-                        <td colSpan={7}>
+                        <td colSpan={showSprint ? 7 : 6}>
                           <div className="empty">
                             {Object.values(filters).some(Boolean)
                               ? 'No tickets match your filters.'
-                              : <>Your backlog is empty.{' '}<button type="button" className="btn btn-sm" onClick={() => setShowCreateForm(true)}>Create a ticket</button>{' '}to get started.</>
+                              : scope === 'all'
+                                ? <>No tickets yet.{' '}<button type="button" className="btn btn-sm" onClick={() => setShowCreateForm(true)}>Create a ticket</button>{' '}to get started.</>
+                                : <>Your backlog is empty.{' '}<button type="button" className="btn btn-sm" onClick={() => setShowCreateForm(true)}>Create a ticket</button>{' '}to get started.</>
                             }
                           </div>
                         </td>
