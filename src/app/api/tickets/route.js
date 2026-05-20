@@ -6,6 +6,24 @@ import { PRIORITIES } from '@/lib/constants';
 
 const PRIORITY_VALUES = new Set(PRIORITIES.map((p) => p.value));
 
+function parsePositiveInteger(value, field) {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = parseInt(value, 10);
+  if (Number.isNaN(parsed) || parsed < 1) {
+    return { error: `${field} must be a positive integer.` };
+  }
+  return parsed;
+}
+
+function parseNonNegativeInteger(value, field) {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = parseInt(value, 10);
+  if (Number.isNaN(parsed) || parsed < 0) {
+    return { error: `${field} must be zero or a positive integer.` };
+  }
+  return parsed;
+}
+
 export function attachLabels(db, tickets) {
   if (!tickets.length) return tickets;
   const ticketIds = tickets.map((ticket) => ticket.id);
@@ -130,6 +148,17 @@ export const POST = withAuth(async (request, user) => {
   const priority = body.priority || 'medium';
   const sprintId = body.sprint_id || null;
   const assigneeId = body.assignee_id || null;
+  const totalPoints = parsePositiveInteger(body.total_points ?? body.story_points, 'total_points');
+  if (totalPoints?.error) return jsonError(totalPoints.error);
+  const pointsRemainingInput = parseNonNegativeInteger(body.points_remaining, 'points_remaining');
+  if (pointsRemainingInput?.error) return jsonError(pointsRemainingInput.error);
+  if (pointsRemainingInput != null && totalPoints == null) {
+    return jsonError('points_remaining requires total_points.');
+  }
+  const pointsRemaining = totalPoints == null ? null : pointsRemainingInput ?? totalPoints;
+  if (pointsRemaining != null && pointsRemaining > totalPoints) {
+    return jsonError('points_remaining cannot exceed total_points.');
+  }
 
   if (!title) return jsonError('Title is required.');
   if (!PRIORITY_VALUES.has(priority)) return jsonError('Invalid priority.');
@@ -143,9 +172,12 @@ export const POST = withAuth(async (request, user) => {
   const id = uuidv4();
   const sortOrder = db.prepare('SELECT COALESCE(MAX(sort_order), 0) + 1 AS next FROM tickets').get().next;
   db.prepare(`
-    INSERT INTO tickets (id, number, title, description, priority, sort_order, sprint_id, assignee_id, creator_id)
-    VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, title, body.description || '', priority, sortOrder, sprintId, assigneeId, user.id);
+    INSERT INTO tickets (
+      id, number, title, description, priority, sort_order, sprint_id, assignee_id,
+      creator_id, total_points, points_remaining
+    )
+    VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, title, body.description || '', priority, sortOrder, sprintId, assigneeId, user.id, totalPoints, pointsRemaining);
 
   return NextResponse.json({ ticket: getTicketById(db, id) }, { status: 201 });
 });

@@ -12,7 +12,8 @@ export default function CreateTicketForm({ users, onCreated, onCancel }) {
   const [description, setDescription] = useState(TICKET_TEMPLATE);
   const [priority, setPriority] = useState('medium');
   const [assigneeId, setAssigneeId] = useState('');
-  const [storyPoints, setStoryPoints] = useState('');
+  const [totalPoints, setTotalPoints] = useState('');
+  const [pointsRemaining, setPointsRemaining] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -20,7 +21,8 @@ export default function CreateTicketForm({ users, onCreated, onCancel }) {
     e.preventDefault();
     setError('');
     setLoading(true);
-    const spParsed = storyPoints !== '' ? parseInt(storyPoints, 10) : null;
+    const totalParsed = totalPoints !== '' ? parseInt(totalPoints, 10) : null;
+    const remainingParsed = pointsRemaining !== '' ? parseInt(pointsRemaining, 10) : null;
     const res = await apiFetch('/api/tickets', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -29,7 +31,8 @@ export default function CreateTicketForm({ users, onCreated, onCancel }) {
         description,
         priority,
         assignee_id: assigneeId || null,
-        ...(spParsed != null && spParsed > 0 ? { story_points: spParsed } : {}),
+        ...(totalParsed != null && totalParsed > 0 ? { total_points: totalParsed } : {}),
+        ...(remainingParsed != null && remainingParsed >= 0 ? { points_remaining: remainingParsed } : {}),
       }),
     });
     const data = await res.json();
@@ -87,15 +90,27 @@ export default function CreateTicketForm({ users, onCreated, onCancel }) {
           </select>
         </div>
         <div className="form-group">
-          <label htmlFor="ticket-story-points">Points</label>
+          <label htmlFor="ticket-total-points">Total Points</label>
           <input
-            id="ticket-story-points"
+            id="ticket-total-points"
             type="number"
             min="1"
-            value={storyPoints}
-            onChange={(e) => setStoryPoints(e.target.value)}
+            value={totalPoints}
+            onChange={(e) => setTotalPoints(e.target.value)}
             placeholder="—"
             style={{ width: '80px' }}
+          />
+        </div>
+        <div className="form-group">
+          <label htmlFor="ticket-points-remaining">Points Remaining</label>
+          <input
+            id="ticket-points-remaining"
+            type="number"
+            min="0"
+            value={pointsRemaining}
+            onChange={(e) => setPointsRemaining(e.target.value)}
+            placeholder="same"
+            style={{ width: '100px' }}
           />
         </div>
       </div>

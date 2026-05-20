@@ -13,8 +13,8 @@ export const GET = withAuth(async () => {
     SELECT s.*,
       (SELECT COUNT(*) FROM tickets WHERE sprint_id = s.id) AS ticket_count,
       (SELECT COUNT(*) FROM tickets WHERE sprint_id = s.id AND status = 'done') AS done_count,
-      (SELECT COALESCE(SUM(story_points), 0) FROM tickets WHERE sprint_id = s.id) AS total_points,
-      (SELECT COALESCE(SUM(story_points), 0) FROM tickets WHERE sprint_id = s.id AND status = 'done') AS done_points
+      (SELECT COALESCE(SUM(total_points), 0) FROM tickets WHERE sprint_id = s.id) AS total_points,
+      (SELECT COALESCE(SUM(CASE WHEN status = 'done' THEN 0 ELSE points_remaining END), 0) FROM tickets WHERE sprint_id = s.id) AS points_remaining
     FROM sprints s
     ORDER BY start_date DESC
   `).all();
@@ -32,5 +32,5 @@ export const POST = withAdmin(async (request) => {
   db.prepare('INSERT INTO sprints (id, name, start_date, end_date) VALUES (?, ?, ?, ?)')
     .run(id, name.trim(), startDate, endDate);
   const sprint = db.prepare('SELECT * FROM sprints WHERE id = ?').get(id);
-  return NextResponse.json({ sprint: { ...sprint, ticket_count: 0, done_count: 0 } }, { status: 201 });
+  return NextResponse.json({ sprint: { ...sprint, ticket_count: 0, done_count: 0, total_points: 0, points_remaining: 0 } }, { status: 201 });
 });

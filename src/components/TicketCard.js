@@ -75,8 +75,10 @@ export default function TicketCard({ ticket, users, onAssign, onView }) {
           return null;
         })()}
         {hasUnresolvedBlockers && <span className="ticket-card-blocked">BLOCKED</span>}
-        {ticket.story_points != null && (
-          <span className="ticket-card-points" title="Story points">{ticket.story_points}pt</span>
+        {ticket.total_points != null && (
+          <span className="ticket-card-points" title="Points remaining / total">
+            {ticket.points_remaining ?? ticket.total_points}/{ticket.total_points}pt
+          </span>
         )}
         {ticket.assignee_username && (
           <span className="ticket-card-assignee" title={ticket.assignee_username}>

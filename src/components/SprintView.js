@@ -16,7 +16,7 @@ function SprintCard({ sprint, isAdmin, onAction, onCompleteWithRollover }) {
           ? `${sprint.done_count}/${sprint.ticket_count} done`
           : `${sprint.ticket_count} tickets - ${sprint.done_count} done`}
         {sprint.total_points > 0 && (
-          <span style={{ marginLeft: '0.5rem' }}>{sprint.done_points}/{sprint.total_points} pts</span>
+          <span style={{ marginLeft: '0.5rem' }}>{sprint.points_remaining}/{sprint.total_points} pts remaining</span>
         )}
       </div>
       <div className="mt-lg flex gap-md">

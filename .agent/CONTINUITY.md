@@ -28,6 +28,7 @@
 - 2026-05-19T11:35:33-0700 [CODE] Superseded Board self-assign behavior: board cards now show an assignee dropdown with Unassigned plus all users; changing it patches `assignee_id` with optimistic UI update.
 - 2026-05-19T11:38:32-0700 [CODE] Kept Board card click as view-mode open behavior and hardened Edit/assignee dropdown event handling so those controls do not bubble and accidentally open the view modal.
 - 2026-05-19T11:40:55-0700 [CODE] Superseded Board card-click view behavior because it interfered with drag/drop: card body no longer opens tickets; explicit `View` button opens read mode and the modal still has its internal Edit button.
+- 2026-05-19T14:09:59-0700 [CODE] Replaced single ticket story-points workflow with `total_points` plus `points_remaining`: create/detail/card/sprint views now expose remaining-over-total, sprint totals aggregate remaining work, and migrations backfill from legacy `story_points`.
 
 ## [DISCOVERIES]
 - 2026-05-19T00:19:44-0700 [TOOL] `date -Is` is unavailable on this BSD/macOS host; used `date +%Y-%m-%dT%H:%M:%S%z` for ISO-like timestamps.
@@ -50,3 +51,4 @@
 - 2026-05-19T11:35:33-0700 [TOOL] Verification completed for Board assignee dropdown: `npm run build` passed.
 - 2026-05-19T11:38:32-0700 [TOOL] Verification completed for Board view-click event handling: `npm run build` passed.
 - 2026-05-19T11:40:55-0700 [TOOL] Verification completed for Board explicit View button: `npm run build` passed.
+- 2026-05-19T14:09:59-0700 [TOOL] Verification completed for total/remaining points: `npm run migrate` passed, `npm run build` passed, `git diff --check` passed, and SQLite schema shows `story_points`, `total_points`, and `points_remaining`.

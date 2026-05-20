@@ -17,8 +17,27 @@ const FIELD_LABELS = {
   assignee_id: 'assignee',
   sort_order: 'sort order',
   due_date: 'due date',
-  story_points: 'story points',
+  total_points: 'total points',
+  points_remaining: 'points remaining',
 };
+
+function parsePositiveInteger(value, field) {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = parseInt(value, 10);
+  if (Number.isNaN(parsed) || parsed < 1) {
+    return { error: `${field} must be a positive integer.` };
+  }
+  return parsed;
+}
+
+function parseNonNegativeInteger(value, field) {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = parseInt(value, 10);
+  if (Number.isNaN(parsed) || parsed < 0) {
+    return { error: `${field} must be zero or a positive integer.` };
+  }
+  return parsed;
+}
 
 async function getId(context) {
   const params = await context.params;
@@ -80,10 +99,15 @@ export const PATCH = withAuth(async (request, user, context) => {
   if (!existing) return jsonError('Ticket not found.', 404);
 
   const body = await request.json();
-  const allowed = ['title', 'description', 'status', 'priority', 'sprint_id', 'assignee_id', 'sort_order', 'due_date', 'story_points'];
+  if ('story_points' in body && !('total_points' in body)) {
+    body.total_points = body.story_points;
+  }
+  const allowed = ['title', 'description', 'status', 'priority', 'sprint_id', 'assignee_id', 'sort_order', 'due_date', 'total_points', 'points_remaining'];
   const sets = [];
   const args = [];
   const changedFieldDetails = [];
+  let nextTotalPoints = existing.total_points ?? null;
+  let nextPointsRemaining = existing.points_remaining ?? null;
 
   for (const field of allowed) {
     if (!(field in body)) continue;
@@ -110,14 +134,15 @@ export const PATCH = withAuth(async (request, user, context) => {
       value = value || null;
       if (value && !/^\d{4}-\d{2}-\d{2}$/.test(value)) return jsonError('Invalid due_date format. Use YYYY-MM-DD.');
     }
-    if (field === 'story_points') {
-      if (value === null || value === undefined || value === '') {
-        value = null;
-      } else {
-        const parsed = parseInt(value, 10);
-        if (isNaN(parsed) || parsed < 1) return jsonError('story_points must be a positive integer.');
-        value = parsed;
-      }
+    if (field === 'total_points') {
+      value = parsePositiveInteger(value, 'total_points');
+      if (value?.error) return jsonError(value.error);
+      nextTotalPoints = value;
+    }
+    if (field === 'points_remaining') {
+      value = parseNonNegativeInteger(value, 'points_remaining');
+      if (value?.error) return jsonError(value.error);
+      nextPointsRemaining = value;
     }
     const previousValue = existing[field] ?? null;
     if (value !== previousValue) {
@@ -125,6 +150,37 @@ export const PATCH = withAuth(async (request, user, context) => {
     }
     sets.push(`${field} = ?`);
     args.push(value);
+  }
+
+  if ('total_points' in body && !('points_remaining' in body)) {
+    if (nextTotalPoints == null) {
+      nextPointsRemaining = null;
+    } else if (body.status === 'done') {
+      nextPointsRemaining = 0;
+    } else if (nextPointsRemaining == null || nextPointsRemaining > nextTotalPoints) {
+      nextPointsRemaining = nextTotalPoints;
+    }
+    const previousValue = existing.points_remaining ?? null;
+    if (nextPointsRemaining !== previousValue) {
+      changedFieldDetails.push({ field: FIELD_LABELS.points_remaining, oldValue: previousValue, newValue: nextPointsRemaining });
+      sets.push('points_remaining = ?');
+      args.push(nextPointsRemaining);
+    }
+  }
+
+  if (body.status === 'done' && !('total_points' in body) && !('points_remaining' in body) && nextTotalPoints != null && nextPointsRemaining !== 0) {
+    const previousValue = existing.points_remaining ?? null;
+    nextPointsRemaining = 0;
+    changedFieldDetails.push({ field: FIELD_LABELS.points_remaining, oldValue: previousValue, newValue: nextPointsRemaining });
+    sets.push('points_remaining = ?');
+    args.push(nextPointsRemaining);
+  }
+
+  if (nextPointsRemaining != null && nextTotalPoints == null) {
+    return jsonError('points_remaining requires total_points.');
+  }
+  if (nextPointsRemaining != null && nextTotalPoints != null && nextPointsRemaining > nextTotalPoints) {
+    return jsonError('points_remaining cannot exceed total_points.');
   }
 
   if (!sets.length && !('position' in body)) return NextResponse.json({ ticket: getTicketById(db, id) });
