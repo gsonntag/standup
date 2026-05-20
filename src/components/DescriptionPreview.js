@@ -1,7 +1,7 @@
 'use client';
 
 const IMAGE_PATTERN = /^!\[([^\]]*)\]\((\/uploads\/[^)\s]+)\)$/;
-const LINK_PATTERN = /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\((https?:\/\/[^)\s]+|\/uploads\/[^)\s]+)\))/g;
+const LINK_PATTERN = /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\((?:https?:\/\/[^)\s]+|\/uploads\/[^)\s]+)\))/g;
 
 function renderInline(text) {
   return text.split(LINK_PATTERN).filter(Boolean).map((part, index) => {

@@ -307,7 +307,7 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
                     return (
                       <div className="event-row" key={item.id}>
                         <span className="text-muted">
-                          {item.actor_username} changed {item.field}: {resolveEventValue(item.field, item.old_value)} → {resolveEventValue(item.field, item.new_value)}
+                          {item.actor_username} changed {item.field}{item.field !== 'description' && <>: {resolveEventValue(item.field, item.old_value)} → {resolveEventValue(item.field, item.new_value)}</>}
                         </span>
                         <span className="text-muted comment-date">{timeAgo(item.created_at)}</span>
                       </div>

@@ -288,6 +288,7 @@ label {
 .description-preview p:last-child,
 .description-bullet:last-child,
 .description-check:last-child { margin-bottom: 0; }
+.description-preview a { word-break: break-all; }
 .description-preview code {
   border: 1px solid var(--border);
   background: var(--bg-alt);
