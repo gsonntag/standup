@@ -1,6 +1,6 @@
 'use client';
 
-import { DndContext, DragOverlay, closestCorners, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { DndContext, DragOverlay, pointerWithin, rectIntersection, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/client-api';
@@ -56,6 +56,11 @@ export default function Board({ sprintId, currentUser }) {
   }, [sprintId]);
 
   useRealtime((event) => { if (event.kind === 'ticket') fetchTickets(); });
+
+  function collisionDetection(args) {
+    const hits = pointerWithin(args);
+    return hits.length > 0 ? hits : rectIntersection(args);
+  }
 
   function handleDragStart(event) {
     const { active } = event;
@@ -282,7 +287,7 @@ export default function Board({ sprintId, currentUser }) {
         </div>
       )}
 
-      <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         {swimlane !== 'none' ? (
           <div className="swimlanes">
             {lanes.map((lane) => (
