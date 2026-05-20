@@ -402,6 +402,13 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
                   value={ticket.due_date || ''}
                   onChange={(e) => updateField('due_date', e.target.value || null)}
                 />
+                {ticket.sprint_id && sprints.find(s => s.id === ticket.sprint_id)?.end_date && (
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    onClick={() => updateField('due_date', sprints.find(s => s.id === ticket.sprint_id).end_date)}
+                  >End of Sprint</button>
+                )}
               </div>
               <div className="detail-field">
                 <div className="detail-field-label">Assignee</div>
