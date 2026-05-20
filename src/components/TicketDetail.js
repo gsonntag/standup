@@ -301,22 +301,6 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
                 )}
               </div>
               <div className="detail-field">
-                <div className="detail-field-label">Activity</div>
-                {activityItems.map((item) => {
-                  if (item._type === 'event' && item.kind === 'field_change') {
-                    return (
-                      <div className="event-row" key={item.id}>
-                        <span className="text-muted">
-                          {item.actor_username} changed {item.field}{item.field !== 'description' && <>: {resolveEventValue(item.field, item.old_value)} → {resolveEventValue(item.field, item.new_value)}</>}
-                        </span>
-                        <span className="text-muted comment-date">{timeAgo(item.created_at)}</span>
-                      </div>
-                    );
-                  }
-                  return null;
-                })}
-              </div>
-              <div className="detail-field">
                 <div className="detail-field-label">Comments</div>
                 <CommentThread
                   ticketId={activeTicketId}
@@ -334,6 +318,22 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
                     )
                   }
                 />
+              </div>
+              <div className="detail-field">
+                <div className="detail-field-label">Activity</div>
+                {activityItems.map((item) => {
+                  if (item._type === 'event' && item.kind === 'field_change') {
+                    return (
+                      <div className="event-row" key={item.id}>
+                        <span className="text-muted">
+                          {item.actor_username} changed {item.field}{item.field !== 'description' && <>: {resolveEventValue(item.field, item.old_value)} → {resolveEventValue(item.field, item.new_value)}</>}
+                        </span>
+                        <span className="text-muted comment-date">{timeAgo(item.created_at)}</span>
+                      </div>
+                    );
+                  }
+                  return null;
+                })}
               </div>
             </div>
             <aside className="detail-sidebar">
