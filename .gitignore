@@ -1,4 +1,7 @@
 node_modules/
 .next/
 data/*.db
+data/*.db-shm
+data/*.db-wal
+.agent/CONTINUITY.md
 .env.local
