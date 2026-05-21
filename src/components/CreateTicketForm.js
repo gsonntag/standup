@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/client-api';
 import { PRIORITIES, TICKET_TEMPLATE } from '@/lib/constants';
 import { uploadPastedImage } from '@/lib/description-paste';
@@ -12,10 +12,18 @@ export default function CreateTicketForm({ users, onCreated, onCancel }) {
   const [description, setDescription] = useState(TICKET_TEMPLATE);
   const [priority, setPriority] = useState('medium');
   const [assigneeId, setAssigneeId] = useState('');
+  const [githubRepoId, setGithubRepoId] = useState('');
+  const [repositories, setRepositories] = useState([]);
   const [totalPoints, setTotalPoints] = useState('');
   const [pointsRemaining, setPointsRemaining] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    apiFetch('/api/github/repositories')
+      .then((res) => res.json())
+      .then((data) => setRepositories(data.repositories || []));
+  }, []);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -31,6 +39,7 @@ export default function CreateTicketForm({ users, onCreated, onCancel }) {
         description,
         priority,
         assignee_id: assigneeId || null,
+        github_repo_id: githubRepoId || null,
         ...(totalParsed != null && totalParsed > 0 ? { total_points: totalParsed } : {}),
         ...(remainingParsed != null && remainingParsed >= 0 ? { points_remaining: remainingParsed } : {}),
       }),
@@ -87,6 +96,13 @@ export default function CreateTicketForm({ users, onCreated, onCancel }) {
           <select id="ticket-assignee" value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)}>
             <option value="">Unassigned</option>
             {users.map((user) => <option key={user.id} value={user.id}>{user.username}</option>)}
+          </select>
+        </div>
+        <div className="form-group">
+          <label htmlFor="ticket-github-repo">Repository</label>
+          <select id="ticket-github-repo" value={githubRepoId} onChange={(e) => setGithubRepoId(e.target.value)}>
+            <option value="">No repository</option>
+            {repositories.map((repo) => <option key={repo.id} value={repo.id}>{repo.full_name}</option>)}
           </select>
         </div>
         <div className="form-group">

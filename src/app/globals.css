@@ -403,6 +403,28 @@ tr:hover td { background: var(--bg-alt); }
 .drop-target { background: var(--bg-alt); }
 .comment-system { font-style: italic; opacity: 0.7; }
 .event-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 0.85rem; border-bottom: 1px solid var(--border); }
+.compact-empty { padding: var(--space-md); text-align: left; }
+.commit-picker { max-height: 420px; }
+.commit-list { list-style: none; display: flex; flex-direction: column; gap: var(--space-sm); }
+.commit-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-sm);
+  border: 1px solid var(--border);
+  background: var(--bg);
+}
+.commit-main {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  font-size: var(--font-size-sm);
+}
+.commit-main > span,
+.commit-main > a {
+  overflow-wrap: anywhere;
+}
 
 @media (max-width: 760px) {
   .navbar { padding: 0 var(--space-md); overflow-x: auto; }

@@ -50,11 +50,39 @@ export function attachLabels(db, tickets) {
   }));
 }
 
+function attachGitHubRepositories(tickets) {
+  return tickets.map((ticket) => {
+    const githubRepository = ticket.github_repository_id
+      ? {
+          id: ticket.github_repository_id,
+          owner: ticket.github_repository_owner,
+          name: ticket.github_repository_name,
+          default_branch: ticket.github_repository_default_branch,
+          html_url: ticket.github_repository_html_url,
+        }
+      : null;
+    const {
+      github_repository_id,
+      github_repository_owner,
+      github_repository_name,
+      github_repository_default_branch,
+      github_repository_html_url,
+      ...rest
+    } = ticket;
+    return { ...rest, github_repository: githubRepository };
+  });
+}
+
 export function getTicketById(db, id) {
   const ticket = db.prepare(`
     SELECT t.*,
       assignee.username AS assignee_username,
       creator.username AS creator_username,
+      gr.id AS github_repository_id,
+      gr.owner AS github_repository_owner,
+      gr.name AS github_repository_name,
+      gr.default_branch AS github_repository_default_branch,
+      gr.html_url AS github_repository_html_url,
       (SELECT COUNT(*) FROM ticket_dependencies WHERE ticket_id = t.id) AS blocker_count,
       (
         SELECT COUNT(*)
@@ -65,10 +93,11 @@ export function getTicketById(db, id) {
     FROM tickets t
     LEFT JOIN users assignee ON assignee.id = t.assignee_id
     JOIN users creator ON creator.id = t.creator_id
+    LEFT JOIN github_repositories gr ON gr.id = t.github_repo_id
     WHERE t.id = ?
   `).get(id);
   if (!ticket) return null;
-  return attachLabels(db, [ticket])[0];
+  return attachGitHubRepositories(attachLabels(db, [ticket]))[0];
 }
 
 export const GET = withAuth(async (request) => {
@@ -123,6 +152,11 @@ export const GET = withAuth(async (request) => {
     SELECT t.*,
       assignee.username AS assignee_username,
       creator.username AS creator_username,
+      gr.id AS github_repository_id,
+      gr.owner AS github_repository_owner,
+      gr.name AS github_repository_name,
+      gr.default_branch AS github_repository_default_branch,
+      gr.html_url AS github_repository_html_url,
       (SELECT COUNT(*) FROM ticket_dependencies WHERE ticket_id = t.id) AS blocker_count,
       (
         SELECT COUNT(*)
@@ -133,12 +167,13 @@ export const GET = withAuth(async (request) => {
     FROM tickets t
     LEFT JOIN users assignee ON assignee.id = t.assignee_id
     JOIN users creator ON creator.id = t.creator_id
+    LEFT JOIN github_repositories gr ON gr.id = t.github_repo_id
     ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
     ORDER BY t.sort_order ASC, t.created_at DESC
     LIMIT ? OFFSET ?
   `).all(...args, limit, offset);
 
-  return NextResponse.json({ tickets: attachLabels(db, tickets), total });
+  return NextResponse.json({ tickets: attachGitHubRepositories(attachLabels(db, tickets)), total });
 });
 
 export const POST = withAuth(async (request, user) => {
@@ -148,6 +183,7 @@ export const POST = withAuth(async (request, user) => {
   const priority = body.priority || 'medium';
   const sprintId = body.sprint_id || null;
   const assigneeId = body.assignee_id || null;
+  const githubRepoId = body.github_repo_id || null;
   const totalPoints = parsePositiveInteger(body.total_points ?? body.story_points, 'total_points');
   if (totalPoints?.error) return jsonError(totalPoints.error);
   const pointsRemainingInput = parseNonNegativeInteger(body.points_remaining, 'points_remaining');
@@ -168,16 +204,19 @@ export const POST = withAuth(async (request, user) => {
   if (assigneeId && !db.prepare('SELECT id FROM users WHERE id = ?').get(assigneeId)) {
     return jsonError('Assignee not found.', 404);
   }
+  if (githubRepoId && !db.prepare('SELECT id FROM github_repositories WHERE id = ?').get(githubRepoId)) {
+    return jsonError('GitHub repository not found.', 404);
+  }
 
   const id = uuidv4();
   const sortOrder = db.prepare('SELECT COALESCE(MAX(sort_order), 0) + 1 AS next FROM tickets').get().next;
   db.prepare(`
     INSERT INTO tickets (
       id, number, title, description, priority, sort_order, sprint_id, assignee_id,
-      creator_id, total_points, points_remaining
+      creator_id, total_points, points_remaining, github_repo_id
     )
-    VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, title, body.description || '', priority, sortOrder, sprintId, assigneeId, user.id, totalPoints, pointsRemaining);
+    VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, title, body.description || '', priority, sortOrder, sprintId, assigneeId, user.id, totalPoints, pointsRemaining, githubRepoId);
 
   return NextResponse.json({ ticket: getTicketById(db, id) }, { status: 201 });
 });

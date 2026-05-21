@@ -19,6 +19,7 @@ const FIELD_LABELS = {
   due_date: 'due date',
   total_points: 'total points',
   points_remaining: 'points remaining',
+  github_repo_id: 'repository',
 };
 
 function parsePositiveInteger(value, field) {
@@ -102,7 +103,7 @@ export const PATCH = withAuth(async (request, user, context) => {
   if ('story_points' in body && !('total_points' in body)) {
     body.total_points = body.story_points;
   }
-  const allowed = ['title', 'description', 'status', 'priority', 'sprint_id', 'assignee_id', 'sort_order', 'due_date', 'total_points', 'points_remaining'];
+  const allowed = ['title', 'description', 'status', 'priority', 'sprint_id', 'assignee_id', 'sort_order', 'due_date', 'total_points', 'points_remaining', 'github_repo_id'];
   const sets = [];
   const args = [];
   const changedFieldDetails = [];
@@ -128,6 +129,12 @@ export const PATCH = withAuth(async (request, user, context) => {
       value = value || null;
       if (value && !db.prepare('SELECT id FROM users WHERE id = ?').get(value)) {
         return jsonError('Assignee not found.', 404);
+      }
+    }
+    if (field === 'github_repo_id') {
+      value = value || null;
+      if (value && !db.prepare('SELECT id FROM github_repositories WHERE id = ?').get(value)) {
+        return jsonError('GitHub repository not found.', 404);
       }
     }
     if (field === 'due_date') {
@@ -207,6 +214,9 @@ export const PATCH = withAuth(async (request, user, context) => {
       if (body.assignee_id) {
         db.prepare('INSERT OR IGNORE INTO ticket_watchers (ticket_id, user_id) VALUES (?, ?)')
           .run(id, body.assignee_id);
+      }
+      if ('github_repo_id' in body && (body.github_repo_id || null) !== (existing.github_repo_id || null)) {
+        db.prepare('DELETE FROM ticket_commits WHERE ticket_id = ?').run(id);
       }
     });
     tx();

@@ -230,5 +230,49 @@ if (!userColumns.includes('discord_id')) {
   db.exec('ALTER TABLE users ADD COLUMN discord_id TEXT');
 }
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS github_repositories (
+    id             TEXT PRIMARY KEY,
+    owner          TEXT NOT NULL,
+    name           TEXT NOT NULL,
+    default_branch TEXT NOT NULL,
+    html_url       TEXT NOT NULL,
+    created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at     TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(owner, name)
+  );
+
+  CREATE TABLE IF NOT EXISTS github_commits (
+    repo_id      TEXT NOT NULL REFERENCES github_repositories(id) ON DELETE CASCADE,
+    sha          TEXT NOT NULL,
+    message      TEXT NOT NULL,
+    author_name  TEXT,
+    author_login TEXT,
+    committed_at TEXT NOT NULL,
+    html_url     TEXT NOT NULL,
+    branches_json TEXT NOT NULL DEFAULT '[]',
+    synced_at    TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (repo_id, sha)
+  );
+  CREATE INDEX IF NOT EXISTS idx_github_commits_repo_date ON github_commits(repo_id, committed_at DESC);
+
+  CREATE TABLE IF NOT EXISTS ticket_commits (
+    ticket_id  TEXT NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+    repo_id    TEXT NOT NULL REFERENCES github_repositories(id) ON DELETE CASCADE,
+    sha        TEXT NOT NULL,
+    linked_by  TEXT NOT NULL REFERENCES users(id),
+    linked_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (ticket_id, repo_id, sha),
+    FOREIGN KEY (repo_id, sha) REFERENCES github_commits(repo_id, sha) ON DELETE CASCADE
+  );
+  CREATE INDEX IF NOT EXISTS idx_ticket_commits_ticket ON ticket_commits(ticket_id, linked_at DESC);
+`);
+
+const githubTicketColumns = db.prepare('PRAGMA table_info(tickets)').all().map(c => c.name);
+if (!githubTicketColumns.includes('github_repo_id')) {
+  db.exec('ALTER TABLE tickets ADD COLUMN github_repo_id TEXT REFERENCES github_repositories(id) ON DELETE SET NULL');
+}
+db.exec('CREATE INDEX IF NOT EXISTS idx_tickets_github_repo ON tickets(github_repo_id);');
+
 console.log('Migrations complete. Database at:', DB_PATH);
 db.close();

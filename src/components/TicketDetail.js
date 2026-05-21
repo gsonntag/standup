@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { apiFetch } from '@/lib/client-api';
 import { PRIORITIES, STATUSES } from '@/lib/constants';
+import { parseTimestamp, timeAgo } from '@/lib/dates';
 import { uploadPastedImage } from '@/lib/description-paste';
 import CommentThread from './CommentThread';
 import { useRealtime } from '@/lib/realtime';
@@ -11,17 +12,6 @@ import DependencyPicker from './DependencyPicker';
 import ImageUploadButton from './ImageUploadButton';
 import LabelPicker from './LabelPicker';
 
-function timeAgo(dateString) {
-  const seconds = Math.floor((new Date() - new Date(dateString)) / 1000);
-  if (seconds < 60) return 'just now';
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
-}
-
 export default function TicketDetail({ ticketId, initialEditing = false, onClose }) {
   const [activeTicketId, setActiveTicketId] = useState(ticketId);
   const [ticket, setTicket] = useState(null);
@@ -29,6 +19,7 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
   const [events, setEvents] = useState([]);
   const [users, setUsers] = useState([]);
   const [sprints, setSprints] = useState([]);
+  const [repositories, setRepositories] = useState([]);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [originalTitle, setOriginalTitle] = useState('');
@@ -40,6 +31,13 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
   const [pointsRemainingInput, setPointsRemainingInput] = useState('');
   const attachFileRef = useRef(null);
   const [attachUploading, setAttachUploading] = useState(false);
+  const [relatedCommits, setRelatedCommits] = useState([]);
+  const [commitPickerOpen, setCommitPickerOpen] = useState(false);
+  const [commitOptions, setCommitOptions] = useState([]);
+  const [commitSearch, setCommitSearch] = useState('');
+  const [commitLoading, setCommitLoading] = useState(false);
+  const [commitSyncing, setCommitSyncing] = useState(false);
+  const [commitError, setCommitError] = useState('');
 
   async function fetchTicket() {
     const res = await apiFetch(`/api/tickets/${activeTicketId}`);
@@ -60,6 +58,12 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
     setComments(data.comments || []);
   }
 
+  async function fetchRelatedCommits() {
+    const res = await apiFetch(`/api/tickets/${activeTicketId}/commits`);
+    const data = await res.json();
+    setRelatedCommits(data.commits || []);
+  }
+
   async function fetchCurrentUser() {
     const res = await apiFetch('/api/auth/me');
     if (res.ok) {
@@ -76,9 +80,11 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
   useEffect(() => {
     fetchTicket();
     fetchComments();
+    fetchRelatedCommits();
     fetchCurrentUser();
     apiFetch('/api/users').then((r) => r.json()).then((d) => setUsers(d.users || []));
     apiFetch('/api/sprints').then((r) => r.json()).then((d) => setSprints(d.sprints || []));
+    apiFetch('/api/github/repositories').then((r) => r.json()).then((d) => setRepositories(d.repositories || []));
   }, [activeTicketId]);
 
   useEffect(() => {
@@ -101,7 +107,7 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
   }
 
   async function updateField(field, value) {
-    const nextValue = ['sprint_id', 'assignee_id'].includes(field) ? value || null : value;
+    const nextValue = ['sprint_id', 'assignee_id', 'github_repo_id'].includes(field) ? value || null : value;
     const res = await apiFetch(`/api/tickets/${activeTicketId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -110,6 +116,11 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
     if (res.ok) {
       fetchTicket();
       fetchComments();
+      if (field === 'github_repo_id') {
+        setRelatedCommits([]);
+        setCommitOptions([]);
+        setCommitPickerOpen(false);
+      }
     }
   }
 
@@ -228,7 +239,79 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
     if (field === 'sprint') {
       return sprints.find((s) => s.id === value)?.name || value;
     }
+    if (field === 'repository') {
+      const repo = repositories.find((r) => r.id === value);
+      return repo ? repo.full_name : value;
+    }
     return value;
+  }
+
+  async function fetchCommitOptions(search = commitSearch) {
+    if (!ticket.github_repo_id) return;
+    setCommitError('');
+    setCommitLoading(true);
+    const params = new URLSearchParams({ ticket_id: activeTicketId, limit: '100' });
+    if (search) params.set('q', search);
+    const res = await apiFetch(`/api/github/repositories/${ticket.github_repo_id}/commits?${params.toString()}`);
+    const data = await res.json();
+    setCommitLoading(false);
+    if (!res.ok) {
+      setCommitError(data.error || 'Failed to load commits.');
+      return;
+    }
+    setCommitOptions(data.commits || []);
+  }
+
+  async function syncCommits() {
+    if (!ticket.github_repo_id) return;
+    setCommitError('');
+    setCommitSyncing(true);
+    const res = await apiFetch(`/api/github/repositories/${ticket.github_repo_id}/sync-commits`, { method: 'POST' });
+    const data = await res.json();
+    setCommitSyncing(false);
+    if (!res.ok) {
+      setCommitError(data.error || 'Failed to refresh commits.');
+      return;
+    }
+    fetchCommitOptions();
+  }
+
+  async function linkCommit(sha) {
+    const res = await apiFetch(`/api/tickets/${activeTicketId}/commits`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sha }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setCommitError(data.error || 'Failed to link commit.');
+      return;
+    }
+    setRelatedCommits(data.commits || []);
+    fetchCommitOptions();
+  }
+
+  async function unlinkCommit(sha) {
+    const res = await apiFetch(`/api/tickets/${activeTicketId}/commits`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sha }),
+    });
+    if (res.ok) {
+      setRelatedCommits((prev) => prev.filter((commit) => commit.sha !== sha));
+      fetchCommitOptions();
+    }
+  }
+
+  function firstLine(message) {
+    return (message || '').split('\n')[0];
+  }
+
+  function branchText(commit) {
+    const branches = commit.branches || [];
+    if (!branches.length) return '';
+    if (branches.length <= 2) return branches.join(', ');
+    return `${branches.slice(0, 2).join(', ')} +${branches.length - 2}`;
   }
 
   if (!ticket) {
@@ -250,7 +333,7 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
   const activityItems = [
     ...events.map((e) => ({ ...e, _type: 'event' })),
     ...comments.map((c) => ({ ...c, _type: 'comment' })),
-  ].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  ].sort((a, b) => parseTimestamp(a.created_at) - parseTimestamp(b.created_at));
 
   return (
     <div className="modal-overlay" onClick={() => onClose({ updated: true })}>
@@ -318,6 +401,79 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
                     )
                   }
                 />
+              </div>
+              <div className="detail-field">
+                <div className="flex-between mb-md">
+                  <div className="detail-field-label">Related commits</div>
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    disabled={!ticket.github_repo_id}
+                    onClick={() => {
+                      const nextOpen = !commitPickerOpen;
+                      setCommitPickerOpen(nextOpen);
+                      if (nextOpen) fetchCommitOptions();
+                    }}
+                  >
+                    Link commits
+                  </button>
+                </div>
+                {!ticket.github_repo_id && <div className="empty compact-empty">Select a repository before linking commits.</div>}
+                {ticket.github_repo_id && relatedCommits.length === 0 && <div className="empty compact-empty">No commits linked</div>}
+                {relatedCommits.length > 0 && (
+                  <ul className="commit-list">
+                    {relatedCommits.map((commit) => (
+                      <li className="commit-row" key={commit.sha}>
+                        <div className="commit-main">
+                          <a href={commit.html_url} target="_blank" rel="noopener noreferrer" className="text-mono">{commit.short_sha}</a>
+                          <span>{firstLine(commit.message)}</span>
+                          <span className="text-muted text-sm">{commit.author_login || commit.author_name || 'unknown'} · {timeAgo(commit.committed_at)}</span>
+                          {branchText(commit) && <span className="text-muted text-sm">{branchText(commit)}</span>}
+                        </div>
+                        <button type="button" className="btn btn-sm" onClick={() => unlinkCommit(commit.sha)}>Unlink</button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {commitPickerOpen && ticket.github_repo_id && (
+                  <div className="label-picker-dropdown commit-picker">
+                    <div className="flex gap-sm mb-md">
+                      <input
+                        type="search"
+                        value={commitSearch}
+                        onChange={(e) => setCommitSearch(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') fetchCommitOptions(commitSearch);
+                        }}
+                        placeholder="Search commits"
+                      />
+                      <button type="button" className="btn btn-sm" onClick={() => fetchCommitOptions(commitSearch)} disabled={commitLoading}>Search</button>
+                      <button type="button" className="btn btn-sm" onClick={syncCommits} disabled={commitSyncing}>
+                        {commitSyncing ? 'Refreshing...' : 'Refresh from GitHub'}
+                      </button>
+                    </div>
+                    {commitError && <div className="form-error">{commitError}</div>}
+                    {commitLoading && <div className="empty compact-empty">Loading commits...</div>}
+                    {!commitLoading && commitOptions.length === 0 && <div className="empty compact-empty">No cached commits</div>}
+                    {!commitLoading && commitOptions.length > 0 && (
+                      <ul className="commit-list">
+                        {commitOptions.map((commit) => (
+                          <li className="commit-row" key={commit.sha}>
+                            <div className="commit-main">
+                              <span className="text-mono">{commit.short_sha}</span>
+                              <span>{firstLine(commit.message)}</span>
+                              <span className="text-muted text-sm">{commit.author_login || commit.author_name || 'unknown'} · {timeAgo(commit.committed_at)}</span>
+                              {branchText(commit) && <span className="text-muted text-sm">{branchText(commit)}</span>}
+                            </div>
+                            <button type="button" className="btn btn-sm" disabled={commit.linked} onClick={() => linkCommit(commit.sha)}>
+                              {commit.linked ? 'Linked' : 'Link'}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="detail-field">
                 <div className="detail-field-label">Activity</div>
@@ -431,6 +587,21 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
                 </select>
               </div>
               <div className="detail-field">
+                <div className="detail-field-label">Repository</div>
+                {isEditing ? (
+                  <select id="detail-github-repo" value={ticket.github_repo_id || ''} onChange={(e) => updateField('github_repo_id', e.target.value)}>
+                    <option value="">No repository</option>
+                    {repositories.map((repo) => <option key={repo.id} value={repo.id}>{repo.full_name}</option>)}
+                  </select>
+                ) : ticket.github_repository ? (
+                  <a href={ticket.github_repository.html_url} target="_blank" rel="noopener noreferrer" className="detail-value">
+                    {ticket.github_repository.owner}/{ticket.github_repository.name}
+                  </a>
+                ) : (
+                  <div className="detail-value">No repository</div>
+                )}
+              </div>
+              <div className="detail-field">
                 <div className="detail-field-label">Labels</div>
                 {isEditing ? (
                   <LabelPicker ticketId={activeTicketId} currentLabels={ticket.labels || []} onUpdate={fetchTicket} />
@@ -486,7 +657,7 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
                 <div className="detail-field-label">Watchers</div>
                 <div className="flex gap-sm" style={{ flexWrap: 'wrap', marginBottom: '4px' }}>
                   {ticket.watchers?.map((w) => (
-                    <span key={w.id} className="label">@{w.username}</span>
+                    <span key={w.id} className="label" style={{ backgroundColor: 'var(--text-muted)' }}>@{w.username}</span>
                   ))}
                   {!ticket.watchers?.length && <span className="detail-value">None</span>}
                 </div>

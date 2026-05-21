@@ -11,6 +11,9 @@ export default function TeamView({ currentUser }) {
   const [error, setError] = useState('');
   const [editingDiscord, setEditingDiscord] = useState(null);
   const [discordInput, setDiscordInput] = useState('');
+  const [repositories, setRepositories] = useState([]);
+  const [repoInput, setRepoInput] = useState('');
+  const [repoLoading, setRepoLoading] = useState(false);
 
   async function fetchUsers() {
     const res = await apiFetch('/api/users');
@@ -18,8 +21,15 @@ export default function TeamView({ currentUser }) {
     setUsers(data.users || []);
   }
 
+  async function fetchRepositories() {
+    const res = await apiFetch('/api/github/repositories');
+    const data = await res.json();
+    setRepositories(data.repositories || []);
+  }
+
   useEffect(() => {
     fetchUsers();
+    fetchRepositories();
   }, []);
 
   const isAdmin = currentUser?.role === 'admin';
@@ -75,6 +85,41 @@ export default function TeamView({ currentUser }) {
       return;
     }
     setUsers((prev) => prev.filter((existing) => existing.id !== user.id));
+  }
+
+  async function addRepository(e) {
+    e.preventDefault();
+    setError('');
+    setRepoLoading(true);
+    const res = await apiFetch('/api/github/repositories', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ full_name: repoInput }),
+    });
+    const data = await res.json();
+    setRepoLoading(false);
+    if (!res.ok) {
+      setError(data.error || 'Failed to add repository.');
+      return;
+    }
+    setRepoInput('');
+    setRepositories((prev) => {
+      const next = prev.filter((repo) => repo.id !== data.repository.id);
+      return [...next, data.repository].sort((a, b) => a.full_name.localeCompare(b.full_name));
+    });
+  }
+
+  async function deleteRepository(repo) {
+    if (!window.confirm(`Remove ${repo.full_name}?`)) return;
+    setError('');
+    const res = await apiFetch(`/api/github/repositories/${repo.id}`, { method: 'DELETE' });
+    let data = {};
+    try { data = await res.json(); } catch (_) {}
+    if (!res.ok) {
+      setError(data.error || 'Failed to remove repository.');
+      return;
+    }
+    setRepositories((prev) => prev.filter((existing) => existing.id !== repo.id));
   }
 
   const colCount = isAdmin ? 5 : 4;
@@ -184,6 +229,61 @@ export default function TeamView({ currentUser }) {
             : "You're the only user here. Ask an admin to add team members."}
         </div>
       )}
+      <div className="page-header mt-xl">
+        <h2>GitHub Repositories</h2>
+      </div>
+      {isAdmin && (
+        <form onSubmit={addRepository} className="form-row mb-lg">
+          <div className="form-group" style={{ maxWidth: '320px' }}>
+            <label htmlFor="github-repository">Repository</label>
+            <input
+              id="github-repository"
+              value={repoInput}
+              onChange={(e) => setRepoInput(e.target.value)}
+              placeholder="owner/name"
+              required
+            />
+          </div>
+          <div className="form-group" style={{ alignSelf: 'flex-end' }}>
+            <button type="submit" className="btn btn-sm" disabled={repoLoading}>
+              {repoLoading ? 'Adding...' : '+ Add Repository'}
+            </button>
+          </div>
+        </form>
+      )}
+      <div className="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Repository</th>
+              <th>Default Branch</th>
+              <th>Updated</th>
+              {isAdmin && <th>Actions</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {repositories.map((repo) => (
+              <tr key={repo.id}>
+                <td className="font-bold">
+                  <a href={repo.html_url} target="_blank" rel="noopener noreferrer">{repo.full_name}</a>
+                </td>
+                <td className="text-muted text-mono">{repo.default_branch}</td>
+                <td className="text-muted text-sm">{repo.updated_at?.split(' ')[0]?.split('T')[0]}</td>
+                {isAdmin && (
+                  <td>
+                    <button type="button" className="btn btn-danger btn-sm" onClick={() => deleteRepository(repo)}>
+                      Remove
+                    </button>
+                  </td>
+                )}
+              </tr>
+            ))}
+            {!repositories.length && (
+              <tr><td colSpan={isAdmin ? 4 : 3}><div className="empty">No repositories</div></td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
