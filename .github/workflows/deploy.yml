@@ -7,6 +7,9 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      SSH_IP: ${{ secrets.SSH_IP }}
+      SSH_USER: ${{ secrets.SSH_USER }}
     steps:
       - name: Set up SSH
         env:
@@ -15,10 +18,10 @@ jobs:
           install -m 700 -d ~/.ssh
           echo "$DEPLOY_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H ${{ secrets.SSH_IP }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H "$SSH_IP" >> ~/.ssh/known_hosts
 
       - name: Pull, build, and restart
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes \
-            ${{ secrets.SSH_USER }}@${{ secrets.SSH_IP }} \
+            "$SSH_USER@$SSH_IP" \
             "cd /var/www/standup && git pull && npm ci --omit=dev && npm run build && npm run migrate && pm2 restart standup"
