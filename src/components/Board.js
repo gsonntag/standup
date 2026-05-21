@@ -5,6 +5,7 @@ import { arrayMove } from '@dnd-kit/sortable';
 import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/client-api';
 import { STATUSES } from '@/lib/constants';
+import { parseTimestamp } from '@/lib/dates';
 import BoardColumn from './BoardColumn';
 import TicketCard from './TicketCard';
 import TicketDetail from './TicketDetail';
@@ -24,6 +25,10 @@ export default function Board({ sprintId, currentUser }) {
   const { toasts, addToast } = useToast();
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+
+  function sortTickets(a, b) {
+    return a.sort_order - b.sort_order || parseTimestamp(b.created_at) - parseTimestamp(a.created_at);
+  }
 
   async function fetchTickets() {
     const res = await apiFetch(`/api/tickets?sprint_id=${sprintId}`);
@@ -127,7 +132,7 @@ export default function Board({ sprintId, currentUser }) {
       const updatedFields = { status: newStatus, ...(newLaneField || {}) };
       if (isSameColumn && !newLaneField) {
         // Reorder within column
-        const colTickets = prev.filter((t) => t.status === newStatus).sort((a, b) => a.sort_order - b.sort_order || new Date(b.created_at) - new Date(a.created_at));
+        const colTickets = prev.filter((t) => t.status === newStatus).sort(sortTickets);
         const oldIdx = colTickets.findIndex((t) => t.id === ticketId);
         const newIdx = colTickets.findIndex((t) => t.id === beforeId);
         if (oldIdx === -1 || newIdx === -1) return prev;
@@ -299,7 +304,7 @@ export default function Board({ sprintId, currentUser }) {
                       key={`${lane.key}-${status.value}`}
                       currentUser={currentUser}
                       status={{ ...status, value: `${lane.key}__${status.value}` }}
-                      tickets={lane.tickets.filter((t) => t.status === status.value).sort((a, b) => a.sort_order - b.sort_order || new Date(b.created_at) - new Date(a.created_at))}
+                      tickets={lane.tickets.filter((t) => t.status === status.value).sort(sortTickets)}
                       users={users}
                       onTicketAssign={assignTicket}
                       onTicketView={(ticketId) => openTicket(ticketId)}
@@ -318,7 +323,7 @@ export default function Board({ sprintId, currentUser }) {
                   key={status.value}
                   currentUser={currentUser}
                   status={status}
-                  tickets={tickets.filter((ticket) => ticket.status === status.value).sort((a, b) => a.sort_order - b.sort_order || new Date(b.created_at) - new Date(a.created_at))}
+                  tickets={tickets.filter((ticket) => ticket.status === status.value).sort(sortTickets)}
                   users={users}
                   onTicketAssign={assignTicket}
                   onTicketView={(ticketId) => openTicket(ticketId)}

@@ -2,17 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/client-api';
+import { timeAgo } from '@/lib/dates';
 import TicketDetail from '@/components/TicketDetail';
-
-function timeAgo(d) {
-  const s = Math.floor((Date.now() - new Date(d)) / 1000);
-  if (s < 60) return 'just now';
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
-}
 
 export default function MyTasksView({ currentUser }) {
   const [data, setData] = useState(null);
