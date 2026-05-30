@@ -64,7 +64,7 @@ export default function TicketCard({ ticket, users, onAssign, onView }) {
             </span>
           ))}
         </span>
-        {ticket.due_date && (() => {
+        {ticket.status !== 'done' && ticket.due_date && (() => {
           const days = daysUntil(ticket.due_date);
           if (isOverdue(ticket.due_date)) {
             return <span className="due-date overdue">overdue</span>;

@@ -109,6 +109,7 @@ export const PATCH = withAuth(async (request, user, context) => {
   const changedFieldDetails = [];
   let nextTotalPoints = existing.total_points ?? null;
   let nextPointsRemaining = existing.points_remaining ?? null;
+  let nextStatus = existing.status;
 
   for (const field of allowed) {
     if (!(field in body)) continue;
@@ -117,7 +118,10 @@ export const PATCH = withAuth(async (request, user, context) => {
       value = value?.trim();
       if (!value) return jsonError('Title is required.');
     }
-    if (field === 'status' && !STATUS_VALUES.has(value)) return jsonError('Invalid status.');
+    if (field === 'status') {
+      if (!STATUS_VALUES.has(value)) return jsonError('Invalid status.');
+      nextStatus = value;
+    }
     if (field === 'priority' && !PRIORITY_VALUES.has(value)) return jsonError('Invalid priority.');
     if (field === 'sprint_id') {
       value = value || null;
@@ -162,7 +166,7 @@ export const PATCH = withAuth(async (request, user, context) => {
   if ('total_points' in body && !('points_remaining' in body)) {
     if (nextTotalPoints == null) {
       nextPointsRemaining = null;
-    } else if (body.status === 'done') {
+    } else if (nextStatus === 'done') {
       nextPointsRemaining = 0;
     } else if (nextPointsRemaining == null || nextPointsRemaining > nextTotalPoints) {
       nextPointsRemaining = nextTotalPoints;
@@ -175,12 +179,34 @@ export const PATCH = withAuth(async (request, user, context) => {
     }
   }
 
-  if (body.status === 'done' && !('total_points' in body) && !('points_remaining' in body) && nextTotalPoints != null && nextPointsRemaining !== 0) {
+  if (nextStatus === 'done' && !('total_points' in body) && !('points_remaining' in body) && nextTotalPoints != null && nextPointsRemaining !== 0) {
     const previousValue = existing.points_remaining ?? null;
     nextPointsRemaining = 0;
     changedFieldDetails.push({ field: FIELD_LABELS.points_remaining, oldValue: previousValue, newValue: nextPointsRemaining });
     sets.push('points_remaining = ?');
     args.push(nextPointsRemaining);
+  }
+
+  if (nextPointsRemaining === 0 && nextStatus !== 'done' && nextStatus !== 'in_review') {
+    const previousValue = existing.status ?? null;
+    nextStatus = 'in_review';
+    const statusSetIndex = sets.findIndex((set) => set === 'status = ?');
+    const statusChangeIndex = changedFieldDetails.findIndex((detail) => detail.field === FIELD_LABELS.status);
+    const statusChange = changedFieldDetails[statusChangeIndex];
+    if (statusSetIndex === -1) {
+      sets.push('status = ?');
+      args.push(nextStatus);
+    } else {
+      args[statusSetIndex] = nextStatus;
+    }
+    if (statusChange) {
+      statusChange.newValue = nextStatus;
+      if (statusChange.oldValue === statusChange.newValue) {
+        changedFieldDetails.splice(statusChangeIndex, 1);
+      }
+    } else {
+      changedFieldDetails.push({ field: FIELD_LABELS.status, oldValue: previousValue, newValue: nextStatus });
+    }
   }
 
   if (nextPointsRemaining != null && nextTotalPoints == null) {
@@ -226,7 +252,7 @@ export const PATCH = withAuth(async (request, user, context) => {
   const { position } = body;
   if (position) {
     const targetSprintId = sets.some(s => s.startsWith('sprint_id')) ? (body.sprint_id || null) : existing.sprint_id;
-    const targetStatus = sets.some(s => s.startsWith('status')) ? body.status : existing.status;
+    const targetStatus = sets.some(s => s.startsWith('status')) ? nextStatus : existing.status;
 
     const columnTickets = db.prepare(`
       SELECT id FROM tickets

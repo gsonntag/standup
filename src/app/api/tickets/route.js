@@ -199,6 +199,7 @@ export const POST = withAuth(async (request, user) => {
   if (pointsRemaining != null && pointsRemaining > totalPoints) {
     return jsonError('points_remaining cannot exceed total_points.');
   }
+  const status = pointsRemaining === 0 ? 'in_review' : 'backlog';
 
   if (!title) return jsonError('Title is required.');
   if (!PRIORITY_VALUES.has(priority)) return jsonError('Invalid priority.');
@@ -216,11 +217,11 @@ export const POST = withAuth(async (request, user) => {
   const sortOrder = db.prepare('SELECT COALESCE(MAX(sort_order), 0) + 1 AS next FROM tickets').get().next;
   db.prepare(`
     INSERT INTO tickets (
-      id, number, title, description, priority, sort_order, sprint_id, assignee_id,
+      id, number, title, description, status, priority, sort_order, sprint_id, assignee_id,
       creator_id, total_points, points_remaining, github_repo_id
     )
-    VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, title, body.description || '', priority, sortOrder, sprintId, assigneeId, user.id, totalPoints, pointsRemaining, githubRepoId);
+    VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, title, body.description || '', status, priority, sortOrder, sprintId, assigneeId, user.id, totalPoints, pointsRemaining, githubRepoId);
 
   return NextResponse.json({ ticket: getTicketById(db, id) }, { status: 201 });
 });
