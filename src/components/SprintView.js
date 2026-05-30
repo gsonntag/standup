@@ -3,7 +3,74 @@
 import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/client-api';
 
-function SprintCard({ sprint, isAdmin, onAction, onCompleteWithRollover }) {
+function SprintForm({ mode, sprint, onSaved, onCancel }) {
+  const [name, setName] = useState(sprint?.name || '');
+  const [startDate, setStartDate] = useState(sprint?.start_date || '');
+  const [endDate, setEndDate] = useState(sprint?.end_date || '');
+  const [error, setError] = useState('');
+
+  function dateFromToday(days) {
+    const date = new Date();
+    date.setDate(date.getDate() + days);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setError('');
+    if (!name.trim()) return setError('Name is required.');
+    if (!startDate) return setError('Start date is required.');
+    if (!endDate || new Date(endDate) <= new Date(startDate)) return setError('End date must be after start date.');
+
+    const res = await apiFetch(sprint ? `/api/sprints/${sprint.id}` : '/api/sprints', {
+      method: sprint ? 'PATCH' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, start_date: startDate, end_date: endDate }),
+    });
+    const data = await res.json();
+    if (!res.ok) return setError(data.error || `Failed to ${sprint ? 'update' : 'create'} sprint.`);
+    onSaved(data.sprint);
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className={mode === 'create' ? 'mb-lg' : 'sprint-edit-form'}>
+      <h3 className="mb-lg">{mode === 'create' ? 'New Sprint' : 'Edit Sprint'}</h3>
+      <div className="form-row">
+        <div className="form-group">
+          <label htmlFor={`${mode}-sprint-name-${sprint?.id || 'new'}`}>Name</label>
+          <input id={`${mode}-sprint-name-${sprint?.id || 'new'}`} value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+        </div>
+        <div className="form-group">
+          <div className="field-label-row">
+            <label htmlFor={`${mode}-sprint-start-${sprint?.id || 'new'}`}>Start Date</label>
+            <button type="button" className="btn btn-sm" onClick={() => setStartDate(dateFromToday(0))}>Today</button>
+          </div>
+          <input id={`${mode}-sprint-start-${sprint?.id || 'new'}`} type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+        </div>
+        <div className="form-group">
+          <div className="field-label-row">
+            <label htmlFor={`${mode}-sprint-end-${sprint?.id || 'new'}`}>End Date</label>
+            <div className="flex gap-sm">
+              <button type="button" className="btn btn-sm" onClick={() => setEndDate(dateFromToday(7))}>+1 week</button>
+              <button type="button" className="btn btn-sm" onClick={() => setEndDate(dateFromToday(14))}>+2 weeks</button>
+            </div>
+          </div>
+          <input id={`${mode}-sprint-end-${sprint?.id || 'new'}`} type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+        </div>
+      </div>
+      {error && <div className="form-error">{error}</div>}
+      <div className="flex gap-md">
+        <button type="submit" className="btn btn-primary btn-sm">{mode === 'create' ? 'Create' : 'Save'}</button>
+        <button type="button" className="btn btn-sm" onClick={onCancel}>Cancel</button>
+      </div>
+    </form>
+  );
+}
+
+function SprintCard({ sprint, isAdmin, onAction, onEdit, onCompleteWithRollover }) {
   return (
     <div className="sprint-card">
       <div className="sprint-card-header">
@@ -23,6 +90,7 @@ function SprintCard({ sprint, isAdmin, onAction, onCompleteWithRollover }) {
         <a href={`/sprints/${sprint.id}/retro`} className="btn btn-sm">Retro</a>
         {isAdmin && (
           <>
+            <button className="btn btn-sm" onClick={() => onEdit(sprint)}>Edit</button>
             {sprint.status === 'planning' && (
               <>
                 <button className="btn btn-sm btn-primary" onClick={() => onAction('start', sprint.id)}>Start Sprint</button>
@@ -39,75 +107,10 @@ function SprintCard({ sprint, isAdmin, onAction, onCompleteWithRollover }) {
   );
 }
 
-function CreateSprintForm({ onCreated, onCancel }) {
-  const [name, setName] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [error, setError] = useState('');
-
-  function dateFromToday(days) {
-    const date = new Date();
-    date.setDate(date.getDate() + days);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  }
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    setError('');
-    if (!name.trim()) return setError('Name is required.');
-    if (!startDate) return setError('Start date is required.');
-    if (!endDate || new Date(endDate) <= new Date(startDate)) return setError('End date must be after start date.');
-    const res = await apiFetch('/api/sprints', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, start_date: startDate, end_date: endDate }),
-    });
-    const data = await res.json();
-    if (!res.ok) return setError(data.error || 'Failed to create sprint.');
-    onCreated(data.sprint);
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="mb-lg">
-      <h3 className="mb-lg">New Sprint</h3>
-      <div className="form-row">
-        <div className="form-group">
-          <label htmlFor="sprint-name">Name</label>
-          <input id="sprint-name" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
-        </div>
-        <div className="form-group">
-          <div className="field-label-row">
-            <label htmlFor="sprint-start">Start Date</label>
-            <button type="button" className="btn btn-sm" onClick={() => setStartDate(dateFromToday(0))}>Today</button>
-          </div>
-          <input id="sprint-start" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-        </div>
-        <div className="form-group">
-          <div className="field-label-row">
-            <label htmlFor="sprint-end">End Date</label>
-            <div className="flex gap-sm">
-              <button type="button" className="btn btn-sm" onClick={() => setEndDate(dateFromToday(7))}>+1 week</button>
-              <button type="button" className="btn btn-sm" onClick={() => setEndDate(dateFromToday(14))}>+2 weeks</button>
-            </div>
-          </div>
-          <input id="sprint-end" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-        </div>
-      </div>
-      {error && <div className="form-error">{error}</div>}
-      <div className="flex gap-md">
-        <button type="submit" className="btn btn-primary btn-sm">Create</button>
-        <button type="button" className="btn btn-sm" onClick={onCancel}>Cancel</button>
-      </div>
-    </form>
-  );
-}
-
 export default function SprintView({ currentUser }) {
   const [sprints, setSprints] = useState([]);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [editingSprint, setEditingSprint] = useState(null);
   const [completingSprintId, setCompletingSprintId] = useState(null);
   const [rolloverDestination, setRolloverDestination] = useState('backlog');
 
@@ -174,13 +177,35 @@ export default function SprintView({ currentUser }) {
         {isAdmin && <button className="btn btn-sm" onClick={() => setShowCreateForm(true)}>+ New Sprint</button>}
       </div>
       {showCreateForm && (
-        <CreateSprintForm
-          onCreated={() => {
+        <SprintForm
+          mode="create"
+          onSaved={() => {
             setShowCreateForm(false);
             fetchSprints();
           }}
           onCancel={() => setShowCreateForm(false)}
         />
+      )}
+      {editingSprint && (
+        <div className="modal-overlay" onClick={() => setEditingSprint(null)}>
+          <div className="modal" style={{ maxWidth: 760 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Edit Sprint</h2>
+              <button type="button" className="modal-close" onClick={() => setEditingSprint(null)}>x</button>
+            </div>
+            <div className="modal-body">
+              <SprintForm
+                mode="edit"
+                sprint={editingSprint}
+                onSaved={() => {
+                  setEditingSprint(null);
+                  fetchSprints();
+                }}
+                onCancel={() => setEditingSprint(null)}
+              />
+            </div>
+          </div>
+        </div>
       )}
       {completingSprintId && (
         <div className="modal-overlay" onClick={() => setCompletingSprintId(null)}>
@@ -212,6 +237,7 @@ export default function SprintView({ currentUser }) {
           sprint={sprint}
           isAdmin={isAdmin}
           onAction={handleAction}
+          onEdit={setEditingSprint}
           onCompleteWithRollover={handleCompleteWithRollover}
         />
       ))}

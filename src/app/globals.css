@@ -363,6 +363,7 @@ tr:hover td { background: var(--bg-alt); }
 .sprint-status-completed { color: var(--text-muted); border-color: var(--border); background: var(--bg-alt); }
 .sprint-dates, .sprint-progress { font-size: var(--font-size-sm); color: var(--text-muted); }
 .sprint-progress { margin-top: var(--space-sm); }
+.sprint-edit-form { margin: 0; }
 
 .dep-list { list-style: none; }
 .dep-item { display: flex; align-items: center; gap: var(--space-md); padding: var(--space-sm) 0; font-size: var(--font-size-sm); border-bottom: 1px solid var(--border); }
