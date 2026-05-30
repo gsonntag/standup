@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { apiFetch } from '@/lib/client-api';
 import { PRIORITIES, STATUSES } from '@/lib/constants';
-import { parseTimestamp, timeAgo } from '@/lib/dates';
+import { isOverdue, parseTimestamp, timeAgo } from '@/lib/dates';
 import { uploadPastedImage } from '@/lib/description-paste';
 import CommentThread from './CommentThread';
 import { useRealtime } from '@/lib/realtime';
@@ -314,6 +314,15 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
     return `${branches.slice(0, 2).join(', ')} +${branches.length - 2}`;
   }
 
+  function dateFromToday(days) {
+    const date = new Date();
+    date.setDate(date.getDate() + days);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
   if (!ticket) {
     return (
       <div className="modal-overlay" onClick={() => onClose()}>
@@ -328,6 +337,8 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
   const sprintName = ticket.sprint_id
     ? sprints.find((sprint) => sprint.id === ticket.sprint_id)?.name || 'Current sprint'
     : 'No sprint';
+  const sprintEndDate = ticket.sprint_id ? sprints.find((s) => s.id === ticket.sprint_id)?.end_date : null;
+  const showOverdueDateShortcuts = ticket.status !== 'done' && isOverdue(ticket.due_date);
 
   // Merge events and comments for the activity section
   const activityItems = [
@@ -558,13 +569,23 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
                   value={ticket.due_date || ''}
                   onChange={(e) => updateField('due_date', e.target.value || null)}
                 />
-                {ticket.sprint_id && sprints.find(s => s.id === ticket.sprint_id)?.end_date && (
-                  <button
-                    type="button"
-                    className="btn btn-sm"
-                    onClick={() => updateField('due_date', sprints.find(s => s.id === ticket.sprint_id).end_date)}
-                  >End of Sprint</button>
-                )}
+                <div className="flex gap-sm" style={{ marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                  {sprintEndDate && (
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      onClick={() => updateField('due_date', sprintEndDate)}
+                    >End of Sprint</button>
+                  )}
+                  {showOverdueDateShortcuts && (
+                    <>
+                      <button type="button" className="btn btn-sm" onClick={() => updateField('due_date', dateFromToday(0))}>Today</button>
+                      <button type="button" className="btn btn-sm" onClick={() => updateField('due_date', dateFromToday(1))}>+1</button>
+                      <button type="button" className="btn btn-sm" onClick={() => updateField('due_date', dateFromToday(2))}>+2</button>
+                      <button type="button" className="btn btn-sm" onClick={() => updateField('due_date', dateFromToday(7))}>+7</button>
+                    </>
+                  )}
+                </div>
               </div>
               <div className="detail-field">
                 <div className="detail-field-label">Assignee</div>
