@@ -86,7 +86,10 @@ export default function BacklogView() {
 
   function buildUrl(fetchOffset = 0, currentFilters = filters, currentScope = scope) {
     const params = new URLSearchParams();
-    if (currentScope === 'backlog') params.set('sprint_id', 'none');
+    if (currentScope === 'backlog') {
+      params.set('sprint_id', 'none');
+      params.set('exclude_status', 'done');
+    }
     params.set('limit', '50');
     params.set('offset', String(fetchOffset));
     if (currentFilters.q) params.set('q', currentFilters.q);

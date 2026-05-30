@@ -119,6 +119,10 @@ export const GET = withAuth(async (request) => {
     where.push('t.status = ?');
     args.push(searchParams.get('status'));
   }
+  if (searchParams.has('exclude_status')) {
+    where.push('t.status != ?');
+    args.push(searchParams.get('exclude_status'));
+  }
   if (searchParams.has('assignee_id')) {
     where.push('t.assignee_id = ?');
     args.push(searchParams.get('assignee_id'));
