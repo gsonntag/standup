@@ -338,16 +338,20 @@ export const PATCH = withAuth(async (request, user, context) => {
     }
   }
 
-  // Status changes: ping the ticket's stakeholders (assignee + watchers), minus the actor.
+  // Status changes: ping the ticket's stakeholders (assignee + watchers), minus
+  // the actor. Moves into In Review / Done are not pinged.
   if (nextStatus !== existing.status) {
-    const pings = ticketStakeholderDiscordIds(id, { excludeUserId: user.id });
-    if (pings.length) {
-      notifyStatusChanged(getTicketById(db, id), {
-        actorName: user.username,
-        oldStatus: existing.status,
-        newStatus: nextStatus,
-        pingDiscordIds: pings,
-      });
+    const SILENT_STATUSES = new Set(['in_review', 'done']);
+    if (!SILENT_STATUSES.has(nextStatus)) {
+      const pings = ticketStakeholderDiscordIds(id, { excludeUserId: user.id });
+      if (pings.length) {
+        notifyStatusChanged(getTicketById(db, id), {
+          actorName: user.username,
+          oldStatus: existing.status,
+          newStatus: nextStatus,
+          pingDiscordIds: pings,
+        });
+      }
     }
 
     // Newly Done: any ticket whose last remaining blocker was this one is now unblocked.
