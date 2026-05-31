@@ -1,5 +1,7 @@
+import bcrypt from 'bcryptjs';
 import { NextResponse } from 'next/server';
 import { jsonError, withAdmin, withAuth } from '@/lib/api';
+import { generateTempPassword } from '@/lib/auth';
 import { ROLES } from '@/lib/constants';
 import { getDb } from '@/lib/db';
 
@@ -22,6 +24,19 @@ export const PATCH = withAuth(async (request, currentUser, context) => {
   if (!isAdmin && !isSelf) return jsonError('Forbidden.', 403);
 
   const body = await request.json();
+
+  if (body.reset_password) {
+    if (!isAdmin) return jsonError('Only admins can reset passwords.', 403);
+    const tempPassword = generateTempPassword();
+    db.prepare('UPDATE users SET password = ?, must_change_password = 1 WHERE id = ?')
+      .run(bcrypt.hashSync(tempPassword, 10), id);
+    db.prepare('DELETE FROM sessions WHERE user_id = ?').run(id);
+    return NextResponse.json({
+      user: db.prepare('SELECT id, username, role, discord_id, must_change_password, created_at FROM users WHERE id = ?').get(id),
+      temp_password: tempPassword,
+    });
+  }
+
   const sets = [];
   const args = [];
 

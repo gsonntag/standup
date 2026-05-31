@@ -229,6 +229,9 @@ const userColumns = db.prepare('PRAGMA table_info(users)').all().map(c => c.name
 if (!userColumns.includes('discord_id')) {
   db.exec('ALTER TABLE users ADD COLUMN discord_id TEXT');
 }
+if (!userColumns.includes('must_change_password')) {
+  db.exec('ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0');
+}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS github_repositories (

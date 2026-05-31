@@ -1,10 +1,18 @@
 import bcrypt from 'bcryptjs';
 import { cookies } from 'next/headers';
 import { v4 as uuidv4 } from 'uuid';
-import { SESSION_DURATION_DAYS } from './constants';
+import { SESSION_DURATION_DAYS, TEMP_PASSWORD_LENGTH } from './constants';
 import { getDb } from './db';
 
 const COOKIE_NAME = 'session';
+
+export function generateTempPassword() {
+  let password = '';
+  for (let i = 0; i < TEMP_PASSWORD_LENGTH; i++) {
+    password += Math.floor(Math.random() * 10);
+  }
+  return password;
+}
 
 export function authenticate(username, password) {
   const db = getDb();
@@ -46,7 +54,7 @@ export async function getCurrentUser() {
   db.prepare('UPDATE sessions SET expires_at = ? WHERE id = ?').run(newExpiry, sessionId);
 
   return db.prepare(
-    'SELECT id, username, role, created_at FROM users WHERE id = ?'
+    'SELECT id, username, role, must_change_password, created_at FROM users WHERE id = ?'
   ).get(session.user_id) || null;
 }
 

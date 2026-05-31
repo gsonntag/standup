@@ -54,3 +54,5 @@ export const ROLES = {
 
 export const SESSION_DURATION_DAYS = 7;
 export const MAX_USERNAME_LENGTH = 8;
+export const MIN_PASSWORD_LENGTH = 4;
+export const TEMP_PASSWORD_LENGTH = 8;

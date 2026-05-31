@@ -14,6 +14,7 @@ export default function TeamView({ currentUser }) {
   const [repositories, setRepositories] = useState([]);
   const [repoInput, setRepoInput] = useState('');
   const [repoLoading, setRepoLoading] = useState(false);
+  const [resetResult, setResetResult] = useState(null);
 
   async function fetchUsers() {
     const res = await apiFetch('/api/users');
@@ -70,6 +71,26 @@ export default function TeamView({ currentUser }) {
     }
     setUsers((prev) => prev.map((u) => u.id === userId ? data.user : u));
     setEditingDiscord(null);
+  }
+
+  async function resetPassword(user) {
+    if (!window.confirm(`Reset ${user.username}'s password? Their current password will stop working.`)) return;
+    setError('');
+    setResetResult(null);
+    setUpdatingUserId(user.id);
+    const res = await apiFetch(`/api/users/${user.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reset_password: true }),
+    });
+    const data = await res.json();
+    setUpdatingUserId(null);
+    if (!res.ok) {
+      setError(data.error || 'Failed to reset password.');
+      return;
+    }
+    setUsers((prev) => prev.map((u) => u.id === user.id ? data.user : u));
+    setResetResult({ username: user.username, tempPassword: data.temp_password });
   }
 
   async function deleteUser(user) {
@@ -134,12 +155,19 @@ export default function TeamView({ currentUser }) {
         <UserForm
           onCreated={(newUser) => {
             setUsers((prev) => [...prev, newUser].sort((a, b) => a.username.localeCompare(b.username)));
-            setShowForm(false);
           }}
           onCancel={() => setShowForm(false)}
         />
       )}
       {error && <div className="form-error">{error}</div>}
+      {resetResult && (
+        <div className="empty" style={{ marginBottom: '1rem', textAlign: 'left' }}>
+          Temporary password for <span className="font-bold">{resetResult.username}</span>:{' '}
+          <span className="text-mono font-bold" style={{ fontSize: '1.1rem' }}>{resetResult.tempPassword}</span>
+          {' '}— they&apos;ll set a new one at next login.
+          <button type="button" className="btn btn-sm" style={{ marginLeft: '0.75rem' }} onClick={() => setResetResult(null)}>Dismiss</button>
+        </div>
+      )}
       <div className="table-container">
         <table>
           <thead>
@@ -203,16 +231,26 @@ export default function TeamView({ currentUser }) {
                   <td className="text-muted text-sm">{user.created_at?.split(' ')[0]?.split('T')[0]}</td>
                   {isAdmin && (
                     <td>
-                      {user.id !== currentUser?.id && (
+                      <span className="flex gap-sm">
                         <button
                           type="button"
-                          className="btn btn-danger btn-sm"
+                          className="btn btn-sm"
                           disabled={updatingUserId === user.id}
-                          onClick={() => deleteUser(user)}
+                          onClick={() => resetPassword(user)}
                         >
-                          Delete
+                          Reset password
                         </button>
-                      )}
+                        {user.id !== currentUser?.id && (
+                          <button
+                            type="button"
+                            className="btn btn-danger btn-sm"
+                            disabled={updatingUserId === user.id}
+                            onClick={() => deleteUser(user)}
+                          >
+                            Delete
+                          </button>
+                        )}
+                      </span>
                     </td>
                   )}
                 </tr>

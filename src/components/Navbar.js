@@ -136,6 +136,7 @@ export default function Navbar({ user }) {
       </div>
       <div className="navbar-right">
         <a href="/team" className={`text-muted${pathname === '/team' ? ' active' : ''}`} style={{ fontSize: '0.875rem' }}>Team</a>
+        <a href="/change-password" className={`text-muted${pathname === '/change-password' ? ' active' : ''}`} style={{ fontSize: '0.875rem' }}>Password</a>
         <span className="navbar-user">{user.username}</span>
         <span className="text-muted">({user.role})</span>
         <button type="button" onClick={handleLogout} className="btn btn-sm">logout</button>
