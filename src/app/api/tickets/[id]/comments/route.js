@@ -3,6 +3,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { jsonError, withAuth } from '@/lib/api';
 import { getDb } from '@/lib/db';
 import { publish } from '@/lib/events';
+import { getTicketById } from '../../route';
+import { notifyComment, ticketStakeholderDiscordIds } from '@/lib/discord';
 
 async function getId(context) {
   const params = await context.params;
@@ -71,5 +73,11 @@ export const POST = withAuth(async (request, user, context) => {
     WHERE c.id = ?
   `).get(id);
   publish({ kind: 'comment', ticket_id: ticketId });
+
+  const pings = ticketStakeholderDiscordIds(ticketId, { excludeUserId: user.id, mentionsForCommentId: id });
+  if (pings.length) {
+    notifyComment(getTicketById(db, ticketId), { actorName: user.username, body: content.trim(), pingDiscordIds: pings });
+  }
+
   return NextResponse.json({ comment }, { status: 201 });
 });

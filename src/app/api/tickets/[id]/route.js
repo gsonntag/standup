@@ -5,7 +5,13 @@ import { getDb } from '@/lib/db';
 import { PRIORITIES, STATUSES } from '@/lib/constants';
 import { getTicketById } from '../route';
 import { publish } from '@/lib/events';
-import { notifyTicketAssigned } from '@/lib/discord';
+import {
+  notifyBlockerResolved,
+  notifyStatusChanged,
+  notifyTicketAssigned,
+  notifyTicketUnassigned,
+  ticketStakeholderDiscordIds,
+} from '@/lib/discord';
 
 const STATUS_VALUES = new Set(STATUSES.map((s) => s.value));
 const PRIORITY_VALUES = new Set(PRIORITIES.map((p) => p.value));
@@ -302,15 +308,60 @@ export const PATCH = withAuth(async (request, user, context) => {
 
   publish({ kind: 'ticket', id, action: 'updated' });
 
+  // Assignment changes: ping the new assignee, and tell the old assignee they were dropped.
   if ('assignee_id' in body) {
     const newAssignee = body.assignee_id || null;
-    if (newAssignee && newAssignee !== (existing.assignee_id || null)) {
-      const a = db.prepare('SELECT username, discord_id FROM users WHERE id = ?').get(newAssignee);
-      notifyTicketAssigned(getTicketById(db, id), {
+    const oldAssignee = existing.assignee_id || null;
+    if (newAssignee !== oldAssignee) {
+      const updated = getTicketById(db, id);
+      if (newAssignee) {
+        const a = db.prepare('SELECT username, discord_id FROM users WHERE id = ?').get(newAssignee);
+        if (newAssignee !== user.id) {
+          notifyTicketAssigned(updated, {
+            actorName: user.username,
+            assigneeDiscordId: a?.discord_id,
+            assigneeName: a?.username,
+          });
+        }
+      }
+      if (oldAssignee && oldAssignee !== user.id) {
+        const old = db.prepare('SELECT discord_id FROM users WHERE id = ?').get(oldAssignee);
+        const newName = newAssignee
+          ? db.prepare('SELECT username FROM users WHERE id = ?').get(newAssignee)?.username
+          : null;
+        notifyTicketUnassigned(updated, {
+          actorName: user.username,
+          oldAssigneeDiscordId: old?.discord_id,
+          newAssigneeName: newName,
+        });
+      }
+    }
+  }
+
+  // Status changes: ping the ticket's stakeholders (assignee + watchers), minus the actor.
+  if (nextStatus !== existing.status) {
+    const pings = ticketStakeholderDiscordIds(id, { excludeUserId: user.id });
+    if (pings.length) {
+      notifyStatusChanged(getTicketById(db, id), {
         actorName: user.username,
-        assigneeDiscordId: a?.discord_id,
-        assigneeName: a?.username,
+        oldStatus: existing.status,
+        newStatus: nextStatus,
+        pingDiscordIds: pings,
       });
+    }
+
+    // Newly Done: any ticket whose last remaining blocker was this one is now unblocked.
+    if (nextStatus === 'done' && existing.status !== 'done') {
+      const resolvedBlocker = db.prepare('SELECT number, title FROM tickets WHERE id = ?').get(id);
+      const dependents = db.prepare('SELECT ticket_id FROM ticket_dependencies WHERE depends_on_id = ?').all(id);
+      for (const { ticket_id: dependentId } of dependents) {
+        const dependent = getTicketById(db, dependentId);
+        if (!dependent || dependent.unresolved_blocker_count > 0) continue;
+        const pingTargets = ticketStakeholderDiscordIds(dependentId, { excludeUserId: user.id });
+        if (pingTargets.length) {
+          notifyBlockerResolved(dependent, { resolvedBlocker, pingDiscordIds: pingTargets });
+        }
+      }
     }
   }
 

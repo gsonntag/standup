@@ -271,6 +271,13 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_ticket_commits_ticket ON ticket_commits(ticket_id, linked_at DESC);
 `);
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS reminder_log (
+    key        TEXT PRIMARY KEY,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`);
+
 const githubTicketColumns = db.prepare('PRAGMA table_info(tickets)').all().map(c => c.name);
 if (!githubTicketColumns.includes('github_repo_id')) {
   db.exec('ALTER TABLE tickets ADD COLUMN github_repo_id TEXT REFERENCES github_repositories(id) ON DELETE SET NULL');
