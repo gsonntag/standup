@@ -230,7 +230,8 @@ export const POST = withAuth(async (request, user) => {
   `).run(id, title, body.description || '', status, priority, sortOrder, sprintId, assigneeId, user.id, totalPoints, pointsRemaining, githubRepoId, dueDate);
 
   const created = getTicketById(db, id);
-  const assigneeDiscordId = assigneeId
+  // Don't ping the creator if they assigned the ticket to themselves.
+  const assigneeDiscordId = assigneeId && assigneeId !== user.id
     ? db.prepare('SELECT discord_id FROM users WHERE id = ?').get(assigneeId)?.discord_id
     : null;
   notifyTicketCreated(created, { creatorName: user.username, assigneeDiscordId });
