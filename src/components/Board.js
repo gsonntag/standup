@@ -20,6 +20,7 @@ export default function Board({ sprintId, currentUser }) {
   const [activeTicket, setActiveTicket] = useState(null);
   const [wipLimits, setWipLimits] = useState({});
   const [swimlane, setSwimlane] = useState('none');
+  const [view, setView] = useState(currentUser?.role === 'admin' ? 'all' : 'mine');
   const [showWipSettings, setShowWipSettings] = useState(false);
   const [wipDraft, setWipDraft] = useState({});
   const { toasts, addToast } = useToast();
@@ -212,11 +213,15 @@ export default function Board({ sprintId, currentUser }) {
     }
   }
 
+  const visibleTickets = view === 'mine' && currentUser
+    ? tickets.filter((t) => t.assignee_id === currentUser.id)
+    : tickets;
+
   // Build swimlane groups
   function buildLanes() {
     if (swimlane === 'assignee') {
       const groups = new Map();
-      for (const t of tickets) {
+      for (const t of visibleTickets) {
         const key = t.assignee_id || 'unassigned';
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key).push(t);
@@ -233,7 +238,7 @@ export default function Board({ sprintId, currentUser }) {
       return lanes;
     } else if (swimlane === 'priority') {
       const groups = new Map();
-      for (const t of tickets) {
+      for (const t of visibleTickets) {
         const key = t.priority || 'medium';
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key).push(t);
@@ -252,6 +257,10 @@ export default function Board({ sprintId, currentUser }) {
   return (
     <>
       <div className="board-toolbar" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
+        <div className="btn-group">
+          <button type="button" className={`btn btn-sm${view === 'all' ? ' btn-active' : ''}`} onClick={() => setView('all')}>Whole Sprint</button>
+          <button type="button" className={`btn btn-sm${view === 'mine' ? ' btn-active' : ''}`} onClick={() => setView('mine')}>My Tickets</button>
+        </div>
         <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
           Swimlanes:&nbsp;
           <select value={swimlane} onChange={(e) => setSwimlane(e.target.value)} style={{ fontSize: '0.8rem' }}>
@@ -323,7 +332,7 @@ export default function Board({ sprintId, currentUser }) {
                   key={status.value}
                   currentUser={currentUser}
                   status={status}
-                  tickets={tickets.filter((ticket) => ticket.status === status.value).sort(sortTickets)}
+                  tickets={visibleTickets.filter((ticket) => ticket.status === status.value).sort(sortTickets)}
                   users={users}
                   onTicketAssign={assignTicket}
                   onTicketView={(ticketId) => openTicket(ticketId)}
@@ -331,9 +340,11 @@ export default function Board({ sprintId, currentUser }) {
                 />
               ))}
             </div>
-            {loaded && !tickets.length && sprintId && (
+            {loaded && !visibleTickets.length && sprintId && (
               <div className="empty" style={{ gridColumn: '1/-1', padding: '2rem', textAlign: 'center' }}>
-                No tickets in this sprint. Move tickets from the backlog or create new ones.
+                {view === 'mine'
+                  ? 'No tickets assigned to you in this sprint.'
+                  : 'No tickets in this sprint. Move tickets from the backlog or create new ones.'}
               </div>
             )}
           </>
