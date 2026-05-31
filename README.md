@@ -26,8 +26,11 @@ Webhook, then copy the URL.
   links (e.g. `https://scrum.example.com`).
 
 All events post to the single channel webhook; the users an event concerns are
-`@`-pinged (when their `discord_id` is set on the Team page), and the person who
-triggered the event is never pinged for their own action. Events:
+`@`-pinged (when their numeric Discord **user ID** is set on the Team page — not
+their username; enable Developer Mode in Discord, then right-click a user → Copy
+User ID), and the person who triggered the event is never pinged for their own
+action. Mentions are placed in the message content (not the embed) so they
+actually notify. Events:
 
 - **Ticket created** — pings the assignee.
 - **Ticket assigned / reassigned** — pings the new assignee; the previous

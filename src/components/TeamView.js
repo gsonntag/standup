@@ -282,7 +282,7 @@ export default function TeamView({ currentUser }) {
                     {editingDiscord === user.id ? (
                       <span className="flex gap-sm" style={{ alignItems: 'center' }}>
                         <input
-                          style={{ width: '140px' }}
+                          style={{ width: '220px' }}
                           value={discordInput}
                           onChange={(e) => setDiscordInput(e.target.value)}
                           onKeyDown={(e) => {
@@ -290,7 +290,8 @@ export default function TeamView({ currentUser }) {
                             if (e.key === 'Escape') setEditingDiscord(null);
                           }}
                           autoFocus
-                          placeholder="username"
+                          placeholder="user ID (e.g. 204255221017214977)"
+                          title="Numeric Discord user ID — required for @-mention pings. In Discord: User Settings → Advanced → Developer Mode, then right-click a user → Copy User ID."
                         />
                         <button type="button" className="btn btn-sm btn-primary" onClick={() => saveDiscord(user.id)}>Save</button>
                         <button type="button" className="btn btn-sm" onClick={() => setEditingDiscord(null)}>Cancel</button>

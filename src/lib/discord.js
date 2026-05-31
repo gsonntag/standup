@@ -77,6 +77,7 @@ function ticketUrl(ticketId) {
 export function notifyTicketCreated(ticket, { creatorName, assigneeDiscordId } = {}) {
   const mention = assigneeDiscordId ? ` · assigned to <@${assigneeDiscordId}>` : '';
   return notifyDiscord({
+    content: mentionPrefix([assigneeDiscordId]),
     embeds: [{
       title: `🆕 #${ticket.number} ${ticket.title}`,
       url: ticketUrl(ticket.id),
