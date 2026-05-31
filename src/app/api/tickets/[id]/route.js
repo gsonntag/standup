@@ -12,6 +12,7 @@ import {
   notifyTicketUnassigned,
   ticketStakeholderDiscordIds,
 } from '@/lib/discord';
+import { classifyDue, markDueReminderSent } from '@/lib/reminders';
 
 const STATUS_VALUES = new Set(STATUSES.map((s) => s.value));
 const PRIORITY_VALUES = new Set(PRIORITIES.map((p) => p.value));
@@ -317,10 +318,15 @@ export const PATCH = withAuth(async (request, user, context) => {
       if (newAssignee) {
         const a = db.prepare('SELECT username, discord_id FROM users WHERE id = ?').get(newAssignee);
         if (newAssignee !== user.id) {
+          // If the ticket is due soon/overdue, bundle the reminder into this same
+          // message (one ping, two embeds) and mark it so the cron doesn't re-ping.
+          const dueKind = classifyDue(updated);
+          if (dueKind) markDueReminderSent(db, updated, dueKind);
           notifyTicketAssigned(updated, {
             actorName: user.username,
             assigneeDiscordId: a?.discord_id,
             assigneeName: a?.username,
+            dueKind,
           });
         }
       }

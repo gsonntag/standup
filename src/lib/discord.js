@@ -87,16 +87,23 @@ export function notifyTicketCreated(ticket, { creatorName, assigneeDiscordId } =
   });
 }
 
-export function notifyTicketAssigned(ticket, { actorName, assigneeDiscordId, assigneeName } = {}) {
+function assignedEmbed(ticket, { actorName, assigneeDiscordId, assigneeName }) {
   const who = assigneeDiscordId ? `<@${assigneeDiscordId}>` : (assigneeName || 'someone');
+  return {
+    title: `👤 #${ticket.number} ${ticket.title}`,
+    url: ticketUrl(ticket.id),
+    description: `Assigned to ${who} by ${actorName || 'someone'}`,
+    color: 0x8250df,
+  };
+}
+
+export function notifyTicketAssigned(ticket, { actorName, assigneeDiscordId, assigneeName, dueKind = null } = {}) {
+  const embeds = [assignedEmbed(ticket, { actorName, assigneeDiscordId, assigneeName })];
+  const due = dueKind ? dueEmbed(ticket, dueKind) : null;
+  if (due) embeds.push(due);
   return notifyDiscord({
     content: mentionPrefix([assigneeDiscordId]),
-    embeds: [{
-      title: `👤 #${ticket.number} ${ticket.title}`,
-      url: ticketUrl(ticket.id),
-      description: `Assigned to ${who} by ${actorName || 'someone'}`,
-      color: 0x8250df,
-    }],
+    embeds,
   });
 }
 
@@ -159,16 +166,22 @@ const DUE_VARIANTS = {
   soon: { emoji: '🟡', text: 'is due tomorrow', color: 0xd4a72c },
 };
 
-export function notifyDueReminder(ticket, { kind, assigneeDiscordId } = {}) {
+function dueEmbed(ticket, kind) {
   const variant = DUE_VARIANTS[kind];
-  if (!variant) return false;
+  if (!variant) return null;
+  return {
+    title: `${variant.emoji} #${ticket.number} ${ticket.title}`,
+    url: ticketUrl(ticket.id),
+    description: `This ticket ${variant.text} (due ${ticket.due_date}).`,
+    color: variant.color,
+  };
+}
+
+export function notifyDueReminder(ticket, { kind, assigneeDiscordId } = {}) {
+  const embed = dueEmbed(ticket, kind);
+  if (!embed) return false;
   return notifyDiscord({
     content: mentionPrefix([assigneeDiscordId]),
-    embeds: [{
-      title: `${variant.emoji} #${ticket.number} ${ticket.title}`,
-      url: ticketUrl(ticket.id),
-      description: `This ticket ${variant.text} (due ${ticket.due_date}).`,
-      color: variant.color,
-    }],
+    embeds: [embed],
   });
 }

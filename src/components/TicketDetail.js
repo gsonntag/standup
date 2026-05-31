@@ -336,6 +336,7 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
   const sprintName = ticket.sprint_id
     ? sprints.find((sprint) => sprint.id === ticket.sprint_id)?.name || 'Current sprint'
     : 'No sprint';
+  const sprintEndDate = ticket.sprint_id ? sprints.find((s) => s.id === ticket.sprint_id)?.end_date : null;
   const showOverdueDateShortcuts = ticket.status !== 'done' && isOverdue(ticket.due_date);
 
   // Merge events and comments for the activity section
@@ -568,6 +569,13 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
                   onChange={(e) => updateField('due_date', e.target.value || null)}
                 />
                 <div className="flex gap-sm" style={{ marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                  {sprintEndDate && (
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      onClick={() => updateField('due_date', sprintEndDate)}
+                    >End of Sprint</button>
+                  )}
                   {showOverdueDateShortcuts && (
                     <>
                       <button type="button" className="btn btn-sm" onClick={() => updateField('due_date', dateFromToday(0))}>Today</button>
