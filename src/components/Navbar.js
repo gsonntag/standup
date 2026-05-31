@@ -135,6 +135,9 @@ export default function Navbar({ user }) {
         )}
       </div>
       <div className="navbar-right">
+        {user.role === 'admin' && (
+          <a href="/dashboard" className={`text-muted${pathname === '/dashboard' ? ' active' : ''}`} style={{ fontSize: '0.875rem' }}>Dashboard</a>
+        )}
         <a href="/team" className={`text-muted${pathname === '/team' ? ' active' : ''}`} style={{ fontSize: '0.875rem' }}>Team</a>
         <span className="navbar-user">{user.username}</span>
         <button type="button" onClick={handleLogout} className="btn btn-sm">logout</button>
