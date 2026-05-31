@@ -29,7 +29,7 @@ export default function LoginPage() {
         return;
       }
 
-      router.push(data.user?.must_change_password ? '/change-password?forced=1' : '/');
+      router.push(data.user?.must_change_password ? '/team' : '/');
       router.refresh();
     } catch {
       setError('Network error. Try again.');

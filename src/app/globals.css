@@ -460,8 +460,11 @@ tr:hover td { background: var(--bg-alt); }
 .filter-input { padding: 4px 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-secondary); color: var(--text); }
 .bulk-bar { display: flex; gap: 0.75rem; align-items: center; padding: 0.75rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 1rem; }
 
-.swimlanes { display: flex; flex-direction: column; gap: 1.5rem; }
-.swimlane-label { font-weight: 600; font-size: 0.85rem; padding: 0.25rem 0; margin-bottom: 0.25rem; border-bottom: 1px solid var(--border); color: var(--text-muted); }
+.swimlanes { display: flex; flex-direction: column; gap: 0.5rem; }
+.swimlane-label { font-weight: 600; font-size: 0.85rem; padding: 0.2rem 0; margin-bottom: 0.2rem; border-bottom: 1px solid var(--border); color: var(--text-muted); }
+/* In swimlane mode each lane fits its own content instead of filling the viewport. */
+.swimlane .board { height: auto; }
+.swimlane .board-column-body { flex: none; min-height: 44px; overflow-y: visible; }
 
 .mention-dropdown { position: absolute; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 4px; z-index: 100; max-height: 160px; overflow-y: auto; min-width: 160px; }
 .mention-option { padding: 6px 10px; cursor: pointer; font-size: 0.875rem; }

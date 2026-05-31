@@ -6,7 +6,7 @@ import { apiFetch } from '@/lib/client-api';
 
 const NAV_LINKS = [
   { href: '/', label: 'Board' },
-  { href: '/backlog', label: 'Backlog' },
+  { href: '/tickets', label: 'Tickets' },
   { href: '/sprints', label: 'Sprints' },
   { href: '/my-tasks', label: 'My Tasks' },
 ];
@@ -80,7 +80,7 @@ export default function Navbar({ user }) {
 
   function openResult(result) {
     setQuery(''); setResults([]); setShowDropdown(false);
-    router.push(`/backlog?ticket=${result.id}`);
+    router.push(`/tickets?ticket=${result.id}`);
   }
 
   async function handleLogout() {
@@ -136,9 +136,7 @@ export default function Navbar({ user }) {
       </div>
       <div className="navbar-right">
         <a href="/team" className={`text-muted${pathname === '/team' ? ' active' : ''}`} style={{ fontSize: '0.875rem' }}>Team</a>
-        <a href="/change-password" className={`text-muted${pathname === '/change-password' ? ' active' : ''}`} style={{ fontSize: '0.875rem' }}>Password</a>
         <span className="navbar-user">{user.username}</span>
-        <span className="text-muted">({user.role})</span>
         <button type="button" onClick={handleLogout} className="btn btn-sm">logout</button>
       </div>
     </nav>

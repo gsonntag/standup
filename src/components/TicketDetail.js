@@ -333,11 +333,9 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
     );
   }
 
-  const assigneeName = ticket.assignee_username || 'Unassigned';
   const sprintName = ticket.sprint_id
     ? sprints.find((sprint) => sprint.id === ticket.sprint_id)?.name || 'Current sprint'
     : 'No sprint';
-  const sprintEndDate = ticket.sprint_id ? sprints.find((s) => s.id === ticket.sprint_id)?.end_date : null;
   const showOverdueDateShortcuts = ticket.status !== 'done' && isOverdue(ticket.due_date);
 
   // Merge events and comments for the activity section
@@ -570,13 +568,6 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
                   onChange={(e) => updateField('due_date', e.target.value || null)}
                 />
                 <div className="flex gap-sm" style={{ marginTop: '0.5rem', flexWrap: 'wrap' }}>
-                  {sprintEndDate && (
-                    <button
-                      type="button"
-                      className="btn btn-sm"
-                      onClick={() => updateField('due_date', sprintEndDate)}
-                    >End of Sprint</button>
-                  )}
                   {showOverdueDateShortcuts && (
                     <>
                       <button type="button" className="btn btn-sm" onClick={() => updateField('due_date', dateFromToday(0))}>Today</button>
@@ -589,14 +580,10 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
               </div>
               <div className="detail-field">
                 <div className="detail-field-label">Assignee</div>
-                {isEditing ? (
-                  <select id="detail-assignee" value={ticket.assignee_id || ''} onChange={(e) => updateField('assignee_id', e.target.value)}>
-                    <option value="">Unassigned</option>
-                    {users.map((user) => <option key={user.id} value={user.id}>{user.username}</option>)}
-                  </select>
-                ) : (
-                  <div className="detail-value">{assigneeName}</div>
-                )}
+                <select id="detail-assignee" value={ticket.assignee_id || ''} onChange={(e) => updateField('assignee_id', e.target.value)}>
+                  <option value="">Unassigned</option>
+                  {users.map((user) => <option key={user.id} value={user.id}>{user.username}</option>)}
+                </select>
               </div>
               <div className="detail-field">
                 <div className="detail-field-label">Sprint</div>
@@ -609,31 +596,19 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
               </div>
               <div className="detail-field">
                 <div className="detail-field-label">Repository</div>
-                {isEditing ? (
-                  <select id="detail-github-repo" value={ticket.github_repo_id || ''} onChange={(e) => updateField('github_repo_id', e.target.value)}>
-                    <option value="">No repository</option>
-                    {repositories.map((repo) => <option key={repo.id} value={repo.id}>{repo.full_name}</option>)}
-                  </select>
-                ) : ticket.github_repository ? (
-                  <a href={ticket.github_repository.html_url} target="_blank" rel="noopener noreferrer" className="detail-value">
-                    {ticket.github_repository.owner}/{ticket.github_repository.name}
+                <select id="detail-github-repo" value={ticket.github_repo_id || ''} onChange={(e) => updateField('github_repo_id', e.target.value)}>
+                  <option value="">No repository</option>
+                  {repositories.map((repo) => <option key={repo.id} value={repo.id}>{repo.full_name}</option>)}
+                </select>
+                {ticket.github_repository && (
+                  <a href={ticket.github_repository.html_url} target="_blank" rel="noopener noreferrer" className="detail-value" style={{ display: 'inline-block', marginTop: '0.25rem' }}>
+                    Open {ticket.github_repository.owner}/{ticket.github_repository.name} ↗
                   </a>
-                ) : (
-                  <div className="detail-value">No repository</div>
                 )}
               </div>
               <div className="detail-field">
                 <div className="detail-field-label">Labels</div>
-                {isEditing ? (
-                  <LabelPicker ticketId={activeTicketId} currentLabels={ticket.labels || []} onUpdate={fetchTicket} />
-                ) : (
-                  <span className="label-list">
-                    {ticket.labels?.map((label) => (
-                      <span key={label.id} className="label" style={{ backgroundColor: label.color }}>{label.name}</span>
-                    ))}
-                    {!ticket.labels?.length && <span className="detail-value">None</span>}
-                  </span>
-                )}
+                <LabelPicker ticketId={activeTicketId} currentLabels={ticket.labels || []} onUpdate={fetchTicket} />
               </div>
               <div className="detail-field">
                 <div className="detail-field-label">Blocked by</div>
@@ -646,12 +621,12 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
                       <button type="button" className="label-picker-item" onClick={() => setActiveTicketId(blocker.id)}>
                         #{blocker.number} {blocker.title}
                       </button>
-                      {isEditing && <button type="button" className="dep-remove" onClick={() => removeDependency(blocker.id)}>x</button>}
+                      <button type="button" className="dep-remove" onClick={() => removeDependency(blocker.id)}>x</button>
                     </li>
                   ))}
                 </ul>
-                {isEditing && <button type="button" className="btn btn-sm mt-md" onClick={() => setShowDependencyPicker((value) => !value)}>+ add blocker</button>}
-                {isEditing && showDependencyPicker && (
+                <button type="button" className="btn btn-sm mt-md" onClick={() => setShowDependencyPicker((value) => !value)}>+ add blocker</button>
+                {showDependencyPicker && (
                   <DependencyPicker
                     ticketId={activeTicketId}
                     blockers={ticket.blockers || []}

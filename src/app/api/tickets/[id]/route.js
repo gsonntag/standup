@@ -5,6 +5,7 @@ import { getDb } from '@/lib/db';
 import { PRIORITIES, STATUSES } from '@/lib/constants';
 import { getTicketById } from '../route';
 import { publish } from '@/lib/events';
+import { notifyTicketAssigned } from '@/lib/discord';
 
 const STATUS_VALUES = new Set(STATUSES.map((s) => s.value));
 const PRIORITY_VALUES = new Set(PRIORITIES.map((p) => p.value));
@@ -163,6 +164,22 @@ export const PATCH = withAuth(async (request, user, context) => {
     args.push(value);
   }
 
+  // When a ticket is moved into a sprint, default its due date to the sprint end date
+  // (unless the request explicitly sets a due date).
+  if ('sprint_id' in body && (body.sprint_id || null) && !('due_date' in body)) {
+    const newSprintId = body.sprint_id;
+    if (newSprintId !== (existing.sprint_id || null)) {
+      const sprint = db.prepare('SELECT end_date FROM sprints WHERE id = ?').get(newSprintId);
+      const sprintEnd = sprint?.end_date || null;
+      const previousValue = existing.due_date ?? null;
+      if (sprintEnd && sprintEnd !== previousValue) {
+        changedFieldDetails.push({ field: FIELD_LABELS.due_date, oldValue: previousValue, newValue: sprintEnd });
+        sets.push('due_date = ?');
+        args.push(sprintEnd);
+      }
+    }
+  }
+
   if ('total_points' in body && !('points_remaining' in body)) {
     if (nextTotalPoints == null) {
       nextPointsRemaining = null;
@@ -284,6 +301,19 @@ export const PATCH = withAuth(async (request, user, context) => {
   }
 
   publish({ kind: 'ticket', id, action: 'updated' });
+
+  if ('assignee_id' in body) {
+    const newAssignee = body.assignee_id || null;
+    if (newAssignee && newAssignee !== (existing.assignee_id || null)) {
+      const a = db.prepare('SELECT username, discord_id FROM users WHERE id = ?').get(newAssignee);
+      notifyTicketAssigned(getTicketById(db, id), {
+        actorName: user.username,
+        assigneeDiscordId: a?.discord_id,
+        assigneeName: a?.username,
+      });
+    }
+  }
+
   return NextResponse.json({ ticket: getTicketById(db, id) });
 });
 

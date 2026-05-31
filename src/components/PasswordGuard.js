@@ -8,8 +8,8 @@ export default function PasswordGuard({ mustChange }) {
   const router = useRouter();
 
   useEffect(() => {
-    if (mustChange && pathname !== '/change-password') {
-      router.replace('/change-password?forced=1');
+    if (mustChange && pathname !== '/team') {
+      router.replace('/team');
     }
   }, [mustChange, pathname, router]);
 

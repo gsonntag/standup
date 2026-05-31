@@ -1,10 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/client-api';
+import { MIN_PASSWORD_LENGTH } from '@/lib/constants';
 import UserForm from './UserForm';
 
 export default function TeamView({ currentUser }) {
+  const router = useRouter();
   const [users, setUsers] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [updatingUserId, setUpdatingUserId] = useState(null);
@@ -15,6 +18,38 @@ export default function TeamView({ currentUser }) {
   const [repoInput, setRepoInput] = useState('');
   const [repoLoading, setRepoLoading] = useState(false);
   const [resetResult, setResetResult] = useState(null);
+  const [showSelfPwForm, setShowSelfPwForm] = useState(false);
+  const [pwCurrent, setPwCurrent] = useState('');
+  const [pwNew, setPwNew] = useState('');
+  const [pwConfirm, setPwConfirm] = useState('');
+  const [pwError, setPwError] = useState('');
+  const [pwLoading, setPwLoading] = useState(false);
+
+  const mustChange = !!currentUser?.must_change_password;
+
+  async function submitPasswordChange(e, forced) {
+    e.preventDefault();
+    setPwError('');
+    if (pwNew.length < MIN_PASSWORD_LENGTH) {
+      return setPwError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
+    }
+    if (pwNew !== pwConfirm) return setPwError('Passwords do not match.');
+    setPwLoading(true);
+    const res = await apiFetch('/api/auth/change-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(forced ? { new_password: pwNew } : { current_password: pwCurrent, new_password: pwNew }),
+    });
+    const data = await res.json();
+    setPwLoading(false);
+    if (!res.ok) return setPwError(data.error || 'Failed to change password.');
+    setPwCurrent(''); setPwNew(''); setPwConfirm('');
+    if (forced) {
+      router.refresh();
+    } else {
+      setShowSelfPwForm(false);
+    }
+  }
 
   async function fetchUsers() {
     const res = await apiFetch('/api/users');
@@ -143,7 +178,28 @@ export default function TeamView({ currentUser }) {
     setRepositories((prev) => prev.filter((existing) => existing.id !== repo.id));
   }
 
-  const colCount = isAdmin ? 5 : 4;
+  const colCount = 5;
+
+  if (mustChange) {
+    return (
+      <div className="page">
+        <div className="page-header"><h1>Set a new password</h1></div>
+        <p className="text-muted mb-lg">You&apos;re using a temporary password. Choose a new one to continue.</p>
+        <form onSubmit={(e) => submitPasswordChange(e, true)} style={{ maxWidth: '320px' }}>
+          <div className="form-group">
+            <label htmlFor="forced-new">New password</label>
+            <input id="forced-new" type="password" value={pwNew} onChange={(e) => setPwNew(e.target.value)} autoComplete="new-password" autoFocus />
+          </div>
+          <div className="form-group">
+            <label htmlFor="forced-confirm">Confirm password</label>
+            <input id="forced-confirm" type="password" value={pwConfirm} onChange={(e) => setPwConfirm(e.target.value)} autoComplete="new-password" />
+          </div>
+          {pwError && <div className="form-error">{pwError}</div>}
+          <button type="submit" className="btn btn-primary" disabled={pwLoading}>{pwLoading ? 'Saving...' : 'Set password'}</button>
+        </form>
+      </div>
+    );
+  }
 
   return (
     <div className="page">
@@ -168,6 +224,28 @@ export default function TeamView({ currentUser }) {
           <button type="button" className="btn btn-sm" style={{ marginLeft: '0.75rem' }} onClick={() => setResetResult(null)}>Dismiss</button>
         </div>
       )}
+      {showSelfPwForm && (
+        <form onSubmit={(e) => submitPasswordChange(e, false)} className="mb-lg" style={{ maxWidth: '320px' }}>
+          <h3 className="mb-md">Change your password</h3>
+          <div className="form-group">
+            <label htmlFor="self-current">Current password</label>
+            <input id="self-current" type="password" value={pwCurrent} onChange={(e) => setPwCurrent(e.target.value)} autoComplete="current-password" autoFocus />
+          </div>
+          <div className="form-group">
+            <label htmlFor="self-new">New password</label>
+            <input id="self-new" type="password" value={pwNew} onChange={(e) => setPwNew(e.target.value)} autoComplete="new-password" />
+          </div>
+          <div className="form-group">
+            <label htmlFor="self-confirm">Confirm password</label>
+            <input id="self-confirm" type="password" value={pwConfirm} onChange={(e) => setPwConfirm(e.target.value)} autoComplete="new-password" />
+          </div>
+          {pwError && <div className="form-error">{pwError}</div>}
+          <div className="flex gap-md">
+            <button type="submit" className="btn btn-primary btn-sm" disabled={pwLoading}>{pwLoading ? 'Saving...' : 'Save'}</button>
+            <button type="button" className="btn btn-sm" onClick={() => { setShowSelfPwForm(false); setPwError(''); setPwCurrent(''); setPwNew(''); setPwConfirm(''); }}>Cancel</button>
+          </div>
+        </form>
+      )}
       <div className="table-container">
         <table>
           <thead>
@@ -176,7 +254,7 @@ export default function TeamView({ currentUser }) {
               <th>Role</th>
               <th>Discord</th>
               <th>Joined</th>
-              {isAdmin && <th>Actions</th>}
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -229,18 +307,27 @@ export default function TeamView({ currentUser }) {
                     )}
                   </td>
                   <td className="text-muted text-sm">{user.created_at?.split(' ')[0]?.split('T')[0]}</td>
-                  {isAdmin && (
-                    <td>
-                      <span className="flex gap-sm">
+                  <td>
+                    <span className="flex gap-sm">
+                      {user.id === currentUser?.id && (
                         <button
                           type="button"
                           className="btn btn-sm"
-                          disabled={updatingUserId === user.id}
-                          onClick={() => resetPassword(user)}
+                          onClick={() => { setShowSelfPwForm(true); setPwError(''); }}
                         >
-                          Reset password
+                          Change password
                         </button>
-                        {user.id !== currentUser?.id && (
+                      )}
+                      {isAdmin && user.id !== currentUser?.id && (
+                        <>
+                          <button
+                            type="button"
+                            className="btn btn-sm"
+                            disabled={updatingUserId === user.id}
+                            onClick={() => resetPassword(user)}
+                          >
+                            Reset password
+                          </button>
                           <button
                             type="button"
                             className="btn btn-danger btn-sm"
@@ -249,10 +336,10 @@ export default function TeamView({ currentUser }) {
                           >
                             Delete
                           </button>
-                        )}
-                      </span>
-                    </td>
-                  )}
+                        </>
+                      )}
+                    </span>
+                  </td>
                 </tr>
               );
             })}

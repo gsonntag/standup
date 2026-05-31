@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { jsonError, withAuth } from '@/lib/api';
 import { getDb } from '@/lib/db';
 import { PRIORITIES } from '@/lib/constants';
+import { notifyTicketCreated } from '@/lib/discord';
 
 const PRIORITY_VALUES = new Set(PRIORITIES.map((p) => p.value));
 
@@ -203,8 +204,11 @@ export const POST = withAuth(async (request, user) => {
 
   if (!title) return jsonError('Title is required.');
   if (!PRIORITY_VALUES.has(priority)) return jsonError('Invalid priority.');
-  if (sprintId && !db.prepare('SELECT id FROM sprints WHERE id = ?').get(sprintId)) {
-    return jsonError('Sprint not found.', 404);
+  let sprintEndDate = null;
+  if (sprintId) {
+    const sprint = db.prepare('SELECT end_date FROM sprints WHERE id = ?').get(sprintId);
+    if (!sprint) return jsonError('Sprint not found.', 404);
+    sprintEndDate = sprint.end_date || null;
   }
   if (assigneeId && !db.prepare('SELECT id FROM users WHERE id = ?').get(assigneeId)) {
     return jsonError('Assignee not found.', 404);
@@ -213,15 +217,23 @@ export const POST = withAuth(async (request, user) => {
     return jsonError('GitHub repository not found.', 404);
   }
 
+  const dueDate = body.due_date || sprintEndDate;
+
   const id = uuidv4();
   const sortOrder = db.prepare('SELECT COALESCE(MAX(sort_order), 0) + 1 AS next FROM tickets').get().next;
   db.prepare(`
     INSERT INTO tickets (
       id, number, title, description, status, priority, sort_order, sprint_id, assignee_id,
-      creator_id, total_points, points_remaining, github_repo_id
+      creator_id, total_points, points_remaining, github_repo_id, due_date
     )
-    VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, title, body.description || '', status, priority, sortOrder, sprintId, assigneeId, user.id, totalPoints, pointsRemaining, githubRepoId);
+    VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, title, body.description || '', status, priority, sortOrder, sprintId, assigneeId, user.id, totalPoints, pointsRemaining, githubRepoId, dueDate);
 
-  return NextResponse.json({ ticket: getTicketById(db, id) }, { status: 201 });
+  const created = getTicketById(db, id);
+  const assigneeDiscordId = assigneeId
+    ? db.prepare('SELECT discord_id FROM users WHERE id = ?').get(assigneeId)?.discord_id
+    : null;
+  notifyTicketCreated(created, { creatorName: user.username, assigneeDiscordId });
+
+  return NextResponse.json({ ticket: created }, { status: 201 });
 });

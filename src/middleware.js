@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 export function middleware(request) {
   const { pathname } = request.nextUrl;
-  const publicPaths = ['/login', '/api/auth/login'];
+  const publicPaths = ['/login', '/api/auth/login', '/api/github/webhook'];
 
   if (publicPaths.some((p) => pathname.startsWith(p))) {
     return NextResponse.next();

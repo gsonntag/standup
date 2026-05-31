@@ -225,7 +225,7 @@ export default function BacklogView() {
   return (
     <div className="page">
       <div className="page-header">
-        <h1>{scope === 'all' ? 'Tickets' : 'Backlog'}</h1>
+        <h1>Tickets</h1>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
           <div className="btn-group">
             <button type="button" className={`btn btn-sm${scope === 'all' ? ' btn-active' : ''}`} onClick={() => handleScopeChange('all')}>All</button>
