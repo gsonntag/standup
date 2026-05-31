@@ -11,8 +11,8 @@ export const STATUSES = [
   { value: 'backlog', label: 'Backlog' },
   { value: 'todo', label: 'To Do' },
   { value: 'in_progress', label: 'In Progress' },
-  { value: 'in_review', label: 'In Review' },
-  { value: 'done', label: 'Done' },
+  { value: 'in_review', label: 'PR' },
+  { value: 'done', label: 'Prod' },
 ];
 
 export const PRIORITIES = [
