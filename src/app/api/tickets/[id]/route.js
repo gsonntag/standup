@@ -30,6 +30,11 @@ const FIELD_LABELS = {
   github_repo_id: 'repository',
 };
 
+function normalizeIdList(value) {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.filter(Boolean).map((item) => String(item)))];
+}
+
 function parsePositiveInteger(value, field) {
   if (value === null || value === undefined || value === '') return null;
   const parsed = parseInt(value, 10);
@@ -111,6 +116,14 @@ export const PATCH = withAuth(async (request, user, context) => {
   if ('story_points' in body && !('total_points' in body)) {
     body.total_points = body.story_points;
   }
+  const assignmentRequested = 'assignee_ids' in body || 'assignee_id' in body;
+  const existingAssigneeIds = db.prepare('SELECT user_id FROM ticket_assignees WHERE ticket_id = ?').all(id).map((row) => row.user_id);
+  const nextAssigneeIds = assignmentRequested
+    ? normalizeIdList('assignee_ids' in body ? body.assignee_ids : (body.assignee_id ? [body.assignee_id] : []))
+    : existingAssigneeIds;
+  if (assignmentRequested) {
+    body.assignee_id = nextAssigneeIds[0] || null;
+  }
   const allowed = ['title', 'description', 'status', 'priority', 'sprint_id', 'assignee_id', 'sort_order', 'due_date', 'total_points', 'points_remaining', 'github_repo_id'];
   const sets = [];
   const args = [];
@@ -139,7 +152,12 @@ export const PATCH = withAuth(async (request, user, context) => {
     }
     if (field === 'assignee_id') {
       value = value || null;
-      if (value && !db.prepare('SELECT id FROM users WHERE id = ?').get(value)) {
+      for (const nextAssigneeId of nextAssigneeIds) {
+        if (!db.prepare('SELECT id FROM users WHERE id = ?').get(nextAssigneeId)) {
+          return jsonError('Assignee not found.', 404);
+        }
+      }
+      if (value && !nextAssigneeIds.includes(value)) {
         return jsonError('Assignee not found.', 404);
       }
     }
@@ -211,7 +229,7 @@ export const PATCH = withAuth(async (request, user, context) => {
     args.push(nextPointsRemaining);
   }
 
-  if (nextPointsRemaining === 0 && nextStatus !== 'done' && nextStatus !== 'in_review') {
+  if ('points_remaining' in body && !('status' in body) && nextPointsRemaining === 0 && nextStatus !== 'done' && nextStatus !== 'in_review') {
     const previousValue = existing.status ?? null;
     nextStatus = 'in_review';
     const statusSetIndex = sets.findIndex((set) => set === 'status = ?');
@@ -261,9 +279,19 @@ export const PATCH = withAuth(async (request, user, context) => {
         );
       }
       // Auto-add assignee as watcher
-      if (body.assignee_id) {
-        db.prepare('INSERT OR IGNORE INTO ticket_watchers (ticket_id, user_id) VALUES (?, ?)')
-          .run(id, body.assignee_id);
+      if (assignmentRequested) {
+        db.prepare('DELETE FROM ticket_assignees WHERE ticket_id = ?').run(id);
+        for (const nextAssigneeId of nextAssigneeIds) {
+          db.prepare('INSERT OR IGNORE INTO ticket_assignees (ticket_id, user_id) VALUES (?, ?)')
+            .run(id, nextAssigneeId);
+          db.prepare('INSERT OR IGNORE INTO ticket_watchers (ticket_id, user_id) VALUES (?, ?)')
+            .run(id, nextAssigneeId);
+        }
+        const removedAssigneeIds = existingAssigneeIds.filter((oldId) => !nextAssigneeIds.includes(oldId));
+        for (const removedAssigneeId of removedAssigneeIds) {
+          db.prepare('DELETE FROM ticket_watchers WHERE ticket_id = ? AND user_id = ?')
+            .run(id, removedAssigneeId);
+        }
       }
       if ('github_repo_id' in body && (body.github_repo_id || null) !== (existing.github_repo_id || null)) {
         db.prepare('DELETE FROM ticket_commits WHERE ticket_id = ?').run(id);
@@ -310,14 +338,16 @@ export const PATCH = withAuth(async (request, user, context) => {
   publish({ kind: 'ticket', id, action: 'updated' });
 
   // Assignment changes: ping the new assignee, and tell the old assignee they were dropped.
-  if ('assignee_id' in body) {
+  if (assignmentRequested) {
     const newAssignee = body.assignee_id || null;
     const oldAssignee = existing.assignee_id || null;
-    if (newAssignee !== oldAssignee) {
+    const addedAssigneeIds = nextAssigneeIds.filter((nextAssigneeId) => !existingAssigneeIds.includes(nextAssigneeId));
+    const removedAssigneeIds = existingAssigneeIds.filter((oldAssigneeId) => !nextAssigneeIds.includes(oldAssigneeId));
+    if (addedAssigneeIds.length || removedAssigneeIds.length || newAssignee !== oldAssignee) {
       const updated = getTicketById(db, id);
-      if (newAssignee) {
-        const a = db.prepare('SELECT username, discord_id FROM users WHERE id = ?').get(newAssignee);
-        if (newAssignee !== user.id) {
+      for (const addedAssigneeId of addedAssigneeIds) {
+        const a = db.prepare('SELECT username, discord_id FROM users WHERE id = ?').get(addedAssigneeId);
+        if (addedAssigneeId !== user.id) {
           // If the ticket is due soon/overdue, bundle the reminder into this same
           // message (one ping, two embeds) and mark it so the cron doesn't re-ping.
           const dueKind = classifyDue(updated);
@@ -330,10 +360,11 @@ export const PATCH = withAuth(async (request, user, context) => {
           });
         }
       }
-      if (oldAssignee && oldAssignee !== user.id) {
-        const old = db.prepare('SELECT discord_id FROM users WHERE id = ?').get(oldAssignee);
-        const newName = newAssignee
-          ? db.prepare('SELECT username FROM users WHERE id = ?').get(newAssignee)?.username
+      for (const removedAssigneeId of removedAssigneeIds) {
+        if (removedAssigneeId === user.id) continue;
+        const old = db.prepare('SELECT discord_id FROM users WHERE id = ?').get(removedAssigneeId);
+        const newName = nextAssigneeIds.length
+          ? `${nextAssigneeIds.length} assignee${nextAssigneeIds.length === 1 ? '' : 's'}`
           : null;
         notifyTicketUnassigned(updated, {
           actorName: user.username,

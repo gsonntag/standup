@@ -33,6 +33,13 @@ export const POST = withAuth(async (request, user) => {
         if (setClauses.length) {
           setClauses.push("updated_at = datetime('now')");
           db.prepare(`UPDATE tickets SET ${setClauses.join(', ')} WHERE id = ?`).run(...setArgs, id);
+          if ('assignee_id' in set) {
+            db.prepare('DELETE FROM ticket_assignees WHERE ticket_id = ?').run(id);
+            if (set.assignee_id) {
+              db.prepare('INSERT OR IGNORE INTO ticket_assignees (ticket_id, user_id) VALUES (?, ?)').run(id, set.assignee_id);
+              db.prepare('INSERT OR IGNORE INTO ticket_watchers (ticket_id, user_id) VALUES (?, ?)').run(id, set.assignee_id);
+            }
+          }
         }
       }
 

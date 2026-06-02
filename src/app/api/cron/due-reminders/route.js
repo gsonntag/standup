@@ -24,22 +24,29 @@ export async function GET(request) {
   const rows = db.prepare(`
     SELECT t.id, u.discord_id
     FROM tickets t
-    JOIN users u ON u.id = t.assignee_id
+    JOIN ticket_assignees ta ON ta.ticket_id = t.id
+    JOIN users u ON u.id = ta.user_id
     WHERE t.status != 'done'
       AND t.due_date IS NOT NULL
       AND u.discord_id IS NOT NULL
   `).all();
 
-  let sent = 0;
+  const discordIdsByTicket = new Map();
   for (const row of rows) {
-    const ticket = getTicketById(db, row.id);
+    if (!discordIdsByTicket.has(row.id)) discordIdsByTicket.set(row.id, []);
+    discordIdsByTicket.get(row.id).push(row.discord_id);
+  }
+
+  let sent = 0;
+  for (const [ticketId, discordIds] of discordIdsByTicket) {
+    const ticket = getTicketById(db, ticketId);
     const kind = classifyDue(ticket);
     if (!kind) continue;
     if (!markDueReminderSent(db, ticket, kind)) continue;
 
-    notifyDueReminder(ticket, { kind, assigneeDiscordId: row.discord_id });
+    notifyDueReminder(ticket, { kind, assigneeDiscordId: discordIds });
     sent++;
   }
 
-  return NextResponse.json({ ok: true, checked: rows.length, sent });
+  return NextResponse.json({ ok: true, checked: discordIdsByTicket.size, sent });
 }

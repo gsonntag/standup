@@ -57,6 +57,39 @@ export function attachLabels(db, tickets) {
   }));
 }
 
+export function attachAssignees(db, tickets) {
+  if (!tickets.length) return tickets;
+  const ticketIds = tickets.map((ticket) => ticket.id);
+  const placeholders = ticketIds.map(() => '?').join(',');
+  const assigneeRows = db.prepare(`
+    SELECT ta.ticket_id, u.id, u.username, u.discord_id
+    FROM ticket_assignees ta
+    JOIN users u ON u.id = ta.user_id
+    WHERE ta.ticket_id IN (${placeholders})
+    ORDER BY u.username ASC
+  `).all(...ticketIds);
+  const assigneesByTicket = new Map();
+  for (const row of assigneeRows) {
+    if (!assigneesByTicket.has(row.ticket_id)) assigneesByTicket.set(row.ticket_id, []);
+    assigneesByTicket.get(row.ticket_id).push({
+      id: row.id,
+      username: row.username,
+      discord_id: row.discord_id,
+    });
+  }
+  return tickets.map((ticket) => {
+    const assignees = assigneesByTicket.get(ticket.id) || [];
+    const primaryAssignee = ticket.assignee_id
+      ? assignees.find((assignee) => assignee.id === ticket.assignee_id)
+      : null;
+    return {
+      ...ticket,
+      assignees,
+      assignee_username: primaryAssignee?.username || ticket.assignee_username || assignees[0]?.username || null,
+    };
+  });
+}
+
 function attachGitHubRepositories(tickets) {
   return tickets.map((ticket) => {
     const githubRepository = ticket.github_repository_id
@@ -104,7 +137,7 @@ export function getTicketById(db, id) {
     WHERE t.id = ?
   `).get(id);
   if (!ticket) return null;
-  return attachGitHubRepositories(attachLabels(db, [ticket]))[0];
+  return attachGitHubRepositories(attachLabels(db, attachAssignees(db, [ticket])))[0];
 }
 
 export const GET = withAuth(async (request) => {
@@ -131,7 +164,8 @@ export const GET = withAuth(async (request) => {
     args.push(searchParams.get('exclude_status'));
   }
   if (searchParams.has('assignee_id')) {
-    where.push('t.assignee_id = ?');
+    where.push('(t.assignee_id = ? OR t.id IN (SELECT ticket_id FROM ticket_assignees WHERE user_id = ?))');
+    args.push(searchParams.get('assignee_id'));
     args.push(searchParams.get('assignee_id'));
   }
   if (searchParams.has('priority')) {
@@ -184,7 +218,7 @@ export const GET = withAuth(async (request) => {
     LIMIT ? OFFSET ?
   `).all(...args, limit, offset);
 
-  return NextResponse.json({ tickets: attachGitHubRepositories(attachLabels(db, tickets)), total });
+  return NextResponse.json({ tickets: attachGitHubRepositories(attachLabels(db, attachAssignees(db, tickets))), total });
 });
 
 export const POST = withAuth(async (request, user) => {
@@ -194,7 +228,8 @@ export const POST = withAuth(async (request, user) => {
   const priority = body.priority || 'medium';
   const requestedStatus = body.status || null;
   const sprintId = body.sprint_id || null;
-  const assigneeId = body.assignee_id || null;
+  const assigneeIds = normalizeIdList(body.assignee_ids || (body.assignee_id ? [body.assignee_id] : []));
+  const assigneeId = assigneeIds[0] || null;
   const githubRepoId = body.github_repo_id || null;
   const labelIds = normalizeIdList(body.label_ids);
   const watcherIds = normalizeIdList(body.watcher_ids);
@@ -223,8 +258,10 @@ export const POST = withAuth(async (request, user) => {
     if (!sprint) return jsonError('Sprint not found.', 404);
     sprintEndDate = sprint.end_date || null;
   }
-  if (assigneeId && !db.prepare('SELECT id FROM users WHERE id = ?').get(assigneeId)) {
-    return jsonError('Assignee not found.', 404);
+  for (const nextAssigneeId of assigneeIds) {
+    if (!db.prepare('SELECT id FROM users WHERE id = ?').get(nextAssigneeId)) {
+      return jsonError('Assignee not found.', 404);
+    }
   }
   if (githubRepoId && !db.prepare('SELECT id FROM github_repositories WHERE id = ?').get(githubRepoId)) {
     return jsonError('GitHub repository not found.', 404);
@@ -265,8 +302,9 @@ export const POST = withAuth(async (request, user) => {
     for (const watcherId of watcherIds) {
       db.prepare('INSERT OR IGNORE INTO ticket_watchers (ticket_id, user_id) VALUES (?, ?)').run(id, watcherId);
     }
-    if (assigneeId) {
-      db.prepare('INSERT OR IGNORE INTO ticket_watchers (ticket_id, user_id) VALUES (?, ?)').run(id, assigneeId);
+    for (const nextAssigneeId of assigneeIds) {
+      db.prepare('INSERT OR IGNORE INTO ticket_assignees (ticket_id, user_id) VALUES (?, ?)').run(id, nextAssigneeId);
+      db.prepare('INSERT OR IGNORE INTO ticket_watchers (ticket_id, user_id) VALUES (?, ?)').run(id, nextAssigneeId);
     }
     for (const blockerId of blockerIds) {
       db.prepare('INSERT OR IGNORE INTO ticket_dependencies (ticket_id, depends_on_id) VALUES (?, ?)').run(id, blockerId);
@@ -276,10 +314,11 @@ export const POST = withAuth(async (request, user) => {
 
   const created = getTicketById(db, id);
   // Don't ping the creator if they assigned the ticket to themselves.
-  const assigneeDiscordId = assigneeId && assigneeId !== user.id
-    ? db.prepare('SELECT discord_id FROM users WHERE id = ?').get(assigneeId)?.discord_id
-    : null;
-  notifyTicketCreated(created, { creatorName: user.username, assigneeDiscordId });
+  const assigneeDiscordIds = assigneeIds
+    .filter((nextAssigneeId) => nextAssigneeId !== user.id)
+    .map((nextAssigneeId) => db.prepare('SELECT discord_id FROM users WHERE id = ?').get(nextAssigneeId)?.discord_id)
+    .filter(Boolean);
+  notifyTicketCreated(created, { creatorName: user.username, assigneeDiscordIds });
 
   return NextResponse.json({ ticket: created }, { status: 201 });
 });

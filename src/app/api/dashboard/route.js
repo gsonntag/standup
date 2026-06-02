@@ -29,7 +29,8 @@ export const GET = withAdmin(async (request) => {
       COALESCE(SUM(t.total_points), 0) AS total_points,
       COALESCE(SUM(CASE WHEN t.status = 'done' THEN t.total_points ELSE 0 END), 0) AS points_done
     FROM users u
-    LEFT JOIN tickets t ON t.assignee_id = u.id AND t.sprint_id = ?
+    LEFT JOIN ticket_assignees ta ON ta.user_id = u.id
+    LEFT JOIN tickets t ON t.id = ta.ticket_id AND t.sprint_id = ?
     GROUP BY u.id, u.username
     ORDER BY points_done DESC, done DESC, u.username ASC
   `).all(sprint.id);

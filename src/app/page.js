@@ -10,7 +10,7 @@ export default async function BoardPage() {
   ).get();
 
   return (
-    <div className="page">
+    <div className="page page-board">
       <AppPageHeader
         eyebrow="Board"
         title={activeSprint ? activeSprint.name : 'Board'}

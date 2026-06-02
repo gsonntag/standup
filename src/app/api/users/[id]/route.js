@@ -77,6 +77,7 @@ export const DELETE = withAdmin(async (_request, currentUser, context) => {
     db.prepare('UPDATE ticket_attachments SET uploader_id = ? WHERE uploader_id = ?').run(currentUser.id, id);
     db.prepare('UPDATE retro_notes SET author_id = ? WHERE author_id = ?').run(currentUser.id, id);
     db.prepare('DELETE FROM comments WHERE author_id = ?').run(id);
+    db.prepare('DELETE FROM ticket_assignees WHERE user_id = ?').run(id);
     db.prepare('UPDATE tickets SET assignee_id = NULL WHERE assignee_id = ?').run(id);
     db.prepare('UPDATE tickets SET creator_id = ? WHERE creator_id = ?').run(currentUser.id, id);
     db.prepare('DELETE FROM users WHERE id = ?').run(id);

@@ -36,7 +36,7 @@ export default function CreateTicketForm({ users, onCreated, onCancel }) {
   const [description, setDescription] = useState(TICKET_TEMPLATE);
   const [status, setStatus] = useState('backlog');
   const [priority, setPriority] = useState('medium');
-  const [assigneeId, setAssigneeId] = useState('');
+  const [assigneeIds, setAssigneeIds] = useState(new Set());
   const [sprintId, setSprintId] = useState('');
   const [githubRepoId, setGithubRepoId] = useState('');
   const [repositories, setRepositories] = useState([]);
@@ -87,7 +87,7 @@ export default function CreateTicketForm({ users, onCreated, onCancel }) {
         status,
         priority,
         sprint_id: sprintId || null,
-        assignee_id: assigneeId || null,
+        assignee_ids: [...assigneeIds],
         github_repo_id: githubRepoId || null,
         due_date: dueDate || null,
         label_ids: selectedLabels.map((label) => label.id),
@@ -208,16 +208,21 @@ export default function CreateTicketForm({ users, onCreated, onCancel }) {
                   </SelectContent>
                 </Select>
               </AppField>
-              <AppField id="ticket-assignee" label="Assignee" icon={UserCircleIcon}>
-                <Select value={assigneeId || 'unassigned'} onValueChange={(value) => setAssigneeId(value === 'unassigned' ? '' : value)}>
-                  <SelectTrigger id="ticket-assignee">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unassigned">Unassigned</SelectItem>
-                    {users.map((user) => <SelectItem key={user.id} value={user.id}>{user.username}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+              <AppField id="ticket-assignee" label="Assignees" icon={UserCircleIcon}>
+                <div className="create-ticket-check-list create-ticket-assignee-list">
+                  {users.map((user) => (
+                    <button
+                      key={user.id}
+                      type="button"
+                      className="create-ticket-check-row"
+                      onClick={() => toggleSetValue(setAssigneeIds, user.id)}
+                    >
+                      <Checkbox checked={assigneeIds.has(user.id)} aria-hidden="true" tabIndex={-1} />
+                      <span>@{user.username}</span>
+                    </button>
+                  ))}
+                  {!users.length && <div className="ticket-detail-empty">No team members yet.</div>}
+                </div>
               </AppField>
               <AppField id="ticket-sprint" label="Sprint" icon={GitForkIcon}>
                 <Select value={sprintId || 'backlog'} onValueChange={(value) => setSprintId(value === 'backlog' ? '' : value)}>

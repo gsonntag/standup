@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { withAuth } from '@/lib/api';
 import { getDb } from '@/lib/db';
-import { attachLabels } from '../../tickets/route';
+import { attachAssignees, attachLabels } from '../../tickets/route';
 
 export const GET = withAuth(async (_request, user) => {
   const db = getDb();
@@ -14,10 +14,10 @@ export const GET = withAuth(async (_request, user) => {
     FROM tickets t
     LEFT JOIN users assignee ON assignee.id = t.assignee_id
     JOIN users creator ON creator.id = t.creator_id
-    WHERE t.assignee_id = ? AND t.status != 'done'
+    WHERE (t.assignee_id = ? OR t.id IN (SELECT ticket_id FROM ticket_assignees WHERE user_id = ?)) AND t.status != 'done'
     ORDER BY t.due_date ASC NULLS LAST, t.priority ASC, t.created_at DESC
-  `).all(user.id);
-  const assigned = attachLabels(db, assignedRaw);
+  `).all(user.id, user.id);
+  const assigned = attachLabels(db, attachAssignees(db, assignedRaw));
 
   // 2. Mentions (unacknowledged)
   const mentions = db.prepare(`
@@ -40,11 +40,11 @@ export const GET = withAuth(async (_request, user) => {
     LEFT JOIN users assignee ON assignee.id = t.assignee_id
     JOIN users creator ON creator.id = t.creator_id
     WHERE tw.user_id = ? AND t.updated_at >= datetime('now', '-7 days')
-    AND t.assignee_id != ?
+    AND t.id NOT IN (SELECT ticket_id FROM ticket_assignees WHERE user_id = ?)
     ORDER BY t.updated_at DESC
     LIMIT 10
   `).all(user.id, user.id);
-  const watching = attachLabels(db, watchingRaw);
+  const watching = attachLabels(db, attachAssignees(db, watchingRaw));
 
   // 4. Blockers cleared (tickets I'm assigned to whose blockers all moved to done in last 7 days)
   const blockersCleared = db.prepare(`
@@ -52,7 +52,7 @@ export const GET = withAuth(async (_request, user) => {
     FROM tickets t
     JOIN ticket_dependencies td ON td.ticket_id = t.id
     JOIN tickets dep ON dep.id = td.depends_on_id
-    WHERE t.assignee_id = ?
+    WHERE (t.assignee_id = ? OR t.id IN (SELECT ticket_id FROM ticket_assignees WHERE user_id = ?))
       AND t.status IN ('backlog', 'todo', 'in_progress')
       AND dep.status = 'done'
       AND dep.updated_at >= datetime('now', '-7 days')
@@ -61,7 +61,7 @@ export const GET = withAuth(async (_request, user) => {
         JOIN tickets dep2 ON dep2.id = td2.depends_on_id
         WHERE td2.ticket_id = t.id AND dep2.status != 'done'
       )
-  `).all(user.id);
+  `).all(user.id, user.id);
 
   return NextResponse.json({ assigned, mentions, watching, blockers_cleared: blockersCleared });
 });

@@ -22,6 +22,9 @@ export function ticketStakeholderDiscordIds(ticketId, { excludeUserId = null, me
   const ids = new Set();
   const ticket = db.prepare('SELECT assignee_id FROM tickets WHERE id = ?').get(ticketId);
   if (ticket?.assignee_id) ids.add(ticket.assignee_id);
+  for (const a of db.prepare('SELECT user_id FROM ticket_assignees WHERE ticket_id = ?').all(ticketId)) {
+    ids.add(a.user_id);
+  }
   for (const w of db.prepare('SELECT user_id FROM ticket_watchers WHERE ticket_id = ?').all(ticketId)) {
     ids.add(w.user_id);
   }
@@ -74,10 +77,11 @@ function ticketUrl(ticketId) {
   return base ? `${base.replace(/\/$/, '')}/tickets?ticket=${ticketId}` : undefined;
 }
 
-export function notifyTicketCreated(ticket, { creatorName, assigneeDiscordId } = {}) {
-  const mention = assigneeDiscordId ? ` · assigned to <@${assigneeDiscordId}>` : '';
+export function notifyTicketCreated(ticket, { creatorName, assigneeDiscordId, assigneeDiscordIds } = {}) {
+  const ids = assigneeDiscordIds || (assigneeDiscordId ? [assigneeDiscordId] : []);
+  const mention = ids.length ? ` · assigned to ${ids.map((id) => `<@${id}>`).join(', ')}` : '';
   return notifyDiscord({
-    content: mentionPrefix([assigneeDiscordId]),
+    content: mentionPrefix(ids),
     embeds: [{
       title: `🆕 #${ticket.number} ${ticket.title}`,
       url: ticketUrl(ticket.id),
@@ -180,8 +184,9 @@ function dueEmbed(ticket, kind) {
 export function notifyDueReminder(ticket, { kind, assigneeDiscordId } = {}) {
   const embed = dueEmbed(ticket, kind);
   if (!embed) return false;
+  const ids = Array.isArray(assigneeDiscordId) ? assigneeDiscordId : [assigneeDiscordId];
   return notifyDiscord({
-    content: mentionPrefix([assigneeDiscordId]),
+    content: mentionPrefix(ids),
     embeds: [embed],
   });
 }

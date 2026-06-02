@@ -7,6 +7,7 @@ import { parseTimestamp, timeAgo } from '@/lib/dates';
 import { uploadPastedImage } from '@/lib/description-paste';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,16 +17,25 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   ActivityIcon,
   ArchiveIcon,
+  ArrowDownIcon,
+  ArrowUpIcon,
   CalendarBlankIcon,
   ChatCircleTextIcon,
   CheckCircleIcon,
+  CircleIcon,
+  FireIcon,
+  FlagIcon,
   GitCommitIcon,
   GitForkIcon,
+  KanbanIcon,
   LinkIcon,
   PaperclipIcon,
   PencilSimpleIcon,
+  RocketLaunchIcon,
+  SpinnerGapIcon,
   TagIcon,
   TrashIcon,
+  TimerIcon,
   UserCircleIcon,
   UsersIcon,
   XIcon,
@@ -36,6 +46,21 @@ import DescriptionPreview from './DescriptionPreview';
 import DependencyPicker from './DependencyPicker';
 import ImageUploadButton from './ImageUploadButton';
 import LabelPicker from './LabelPicker';
+
+const STATUS_ICONS = {
+  backlog: KanbanIcon,
+  todo: CircleIcon,
+  in_progress: SpinnerGapIcon,
+  in_review: TimerIcon,
+  done: RocketLaunchIcon,
+};
+
+const PRIORITY_ICONS = {
+  low: ArrowDownIcon,
+  medium: FlagIcon,
+  high: ArrowUpIcon,
+  urgent: FireIcon,
+};
 
 export default function TicketDetail({ ticketId, initialEditing = false, onClose }) {
   const [activeTicketId, setActiveTicketId] = useState(ticketId);
@@ -149,6 +174,25 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
     }
   }
 
+  async function updateAssignees(nextAssigneeIds) {
+    const res = await apiFetch(`/api/tickets/${activeTicketId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ assignee_ids: nextAssigneeIds }),
+    });
+    if (res.ok) {
+      fetchTicket();
+      fetchComments();
+    }
+  }
+
+  function toggleAssignee(userId) {
+    const current = new Set((ticket.assignees || []).map((assignee) => assignee.id));
+    if (current.has(userId)) current.delete(userId);
+    else current.add(userId);
+    updateAssignees([...current]);
+  }
+
   async function finishEditing() {
     const titleChanged = title !== originalTitle;
     const descriptionChanged = description !== originalDescription;
@@ -224,6 +268,11 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
         body: JSON.stringify({ user_id: currentUser.id }),
       });
     }
+    fetchTicket();
+  }
+
+  async function removeWatcher(userId) {
+    await apiFetch(`/api/tickets/${activeTicketId}/watchers/${userId}`, { method: 'DELETE' });
     fetchTicket();
   }
 
@@ -362,6 +411,13 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
     ? sprints.find((sprint) => sprint.id === ticket.sprint_id)?.name || 'Current sprint'
     : 'No sprint';
   const sprintEndDate = ticket.sprint_id ? sprints.find((s) => s.id === ticket.sprint_id)?.end_date : null;
+  const assignees = ticket.assignees?.length
+    ? ticket.assignees
+    : ticket.assignee_id
+      ? [{ id: ticket.assignee_id, username: ticket.assignee_username }]
+      : [];
+  const HeaderStatusIcon = STATUS_ICONS[ticket.status] || CircleIcon;
+  const HeaderPriorityIcon = PRIORITY_ICONS[ticket.priority] || FlagIcon;
 
   // Merge events and comments for the activity section
   const activityItems = [
@@ -376,9 +432,13 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
           <div className="ticket-detail-title-block">
             <div className="ticket-detail-kicker">
               <Badge variant="outline">#{ticket.number}</Badge>
-              <Badge variant={ticket.status === 'done' ? 'secondary' : 'outline'}>{ticket.status.replaceAll('_', ' ')}</Badge>
+              <Badge className={`status-badge status-badge-${ticket.status}`} variant="outline">
+                <HeaderStatusIcon weight="bold" />
+                {ticket.status.replaceAll('_', ' ')}
+              </Badge>
               {ticket.priority && (
                 <Badge className={`priority-badge priority-badge-${ticket.priority}`} variant="outline">
+                  <HeaderPriorityIcon weight="bold" />
                   {ticket.priority}
                 </Badge>
               )}
@@ -633,21 +693,34 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
                 <div className="ticket-person-pill">@{ticket.creator_username}</div>
               </div>
               <div className="ticket-property-field">
-                <Label>Primary assignee</Label>
-                <Select value={ticket.assignee_id || 'unassigned'} onValueChange={(value) => updateField('assignee_id', value === 'unassigned' ? '' : value)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unassigned">Unassigned</SelectItem>
-                    {users.map((user) => <SelectItem key={user.id} value={user.id}>{user.username}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Label>Assignees</Label>
+                <div className="ticket-assignee-check-list">
+                  {users.map((user) => (
+                    <button
+                      key={user.id}
+                      type="button"
+                      className="ticket-assignee-check-row"
+                      onClick={() => toggleAssignee(user.id)}
+                    >
+                      <Checkbox checked={assignees.some((assignee) => assignee.id === user.id)} aria-hidden="true" tabIndex={-1} />
+                      <span>@{user.username}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="ticket-property-field">
                 <Label>Watchers</Label>
                 <div className="ticket-pill-list">
-                  {ticket.watchers?.map((w) => <span key={w.id} className="ticket-person-pill">@{w.username}</span>)}
+                  {ticket.watchers?.map((w) => (
+                    <span key={w.id} className="ticket-person-pill ticket-person-pill-removable">
+                      @{w.username}
+                      {(currentUser?.role === 'admin' || currentUser?.id === w.id) && (
+                        <button type="button" onClick={() => removeWatcher(w.id)} aria-label={`Remove ${w.username} as watcher`}>
+                          <XIcon weight="bold" />
+                        </button>
+                      )}
+                    </span>
+                  ))}
                   {!ticket.watchers?.length && <span className="text-muted">None</span>}
                 </div>
                 {currentUser && (
@@ -669,7 +742,17 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
                 <Select value={ticket.status} onValueChange={(value) => updateField('status', value)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {STATUSES.map((status) => <SelectItem key={status.value} value={status.value}>{status.label}</SelectItem>)}
+                    {STATUSES.map((status) => {
+                      const StatusIcon = STATUS_ICONS[status.value] || CircleIcon;
+                      return (
+                        <SelectItem key={status.value} value={status.value}>
+                          <span className={`select-icon-option status-option status-option-${status.value}`}>
+                            <StatusIcon weight="bold" />
+                            {status.label}
+                          </span>
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>
@@ -678,7 +761,17 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
                 <Select value={ticket.priority} onValueChange={(value) => updateField('priority', value)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {PRIORITIES.map((priority) => <SelectItem key={priority.value} value={priority.value}>{priority.label}</SelectItem>)}
+                    {PRIORITIES.map((priority) => {
+                      const PriorityIcon = PRIORITY_ICONS[priority.value] || FlagIcon;
+                      return (
+                        <SelectItem key={priority.value} value={priority.value}>
+                          <span className={`select-icon-option priority-option priority-option-${priority.value}`}>
+                            <PriorityIcon weight="bold" />
+                            {priority.label}
+                          </span>
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>

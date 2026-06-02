@@ -25,7 +25,7 @@ export default function Board({ sprintId, currentUser }) {
   const [activeTicket, setActiveTicket] = useState(null);
   const [wipLimits, setWipLimits] = useState({});
   const [swimlane, setSwimlane] = useState('none');
-  const [view, setView] = useState(currentUser?.role === 'admin' ? 'all' : 'mine');
+  const [view, setView] = useState('all');
   const [showWipSettings, setShowWipSettings] = useState(false);
   const [wipDraft, setWipDraft] = useState({});
   const { toasts, addToast } = useToast();
@@ -130,7 +130,10 @@ export default function Board({ sprintId, currentUser }) {
 
     // Determine lane field update
     if (swimlane === 'assignee' && newLaneKey !== null) {
-      newLaneField = { assignee_id: newLaneKey === 'unassigned' ? null : newLaneKey };
+      const nextAssigneeIds = newLaneKey === 'unassigned'
+        ? []
+        : [...new Set([newLaneKey, ...(current.assignees || []).map((assignee) => assignee.id)])];
+      newLaneField = { assignee_id: nextAssigneeIds[0] || null, assignee_ids: nextAssigneeIds };
     } else if (swimlane === 'priority' && newLaneKey !== null) {
       newLaneField = { priority: newLaneKey };
     }
@@ -186,17 +189,43 @@ export default function Board({ sprintId, currentUser }) {
     setSelectedTicket({ id: ticketId, editing });
   }
 
-  async function assignTicket(ticketId, assigneeId) {
-    const assignee = users.find((user) => user.id === assigneeId);
+  function handleBoardWheel(event) {
+    const board = event.currentTarget;
+    const columnBody = event.target.closest?.('.board-column-body');
+    const deltaY = event.deltaY || 0;
+    const deltaX = event.deltaX || 0;
+    const mostlyVertical = Math.abs(deltaY) >= Math.abs(deltaX);
+
+    if (columnBody && board.contains(columnBody) && mostlyVertical) {
+      const canScrollColumn = columnBody.scrollHeight > columnBody.clientHeight + 1;
+      const atTop = columnBody.scrollTop <= 0;
+      const atBottom = columnBody.scrollTop + columnBody.clientHeight >= columnBody.scrollHeight - 1;
+      if (canScrollColumn && ((deltaY < 0 && !atTop) || (deltaY > 0 && !atBottom))) {
+        return;
+      }
+    }
+
+    const horizontalDelta = Math.abs(deltaX) > Math.abs(deltaY) ? deltaX : deltaY;
+    if (!horizontalDelta || board.scrollWidth <= board.clientWidth) return;
+    event.preventDefault();
+    board.scrollLeft += horizontalDelta;
+  }
+
+  async function assignTicket(ticketId, assigneeIds) {
+    const nextAssigneeIds = Array.isArray(assigneeIds) ? assigneeIds : (assigneeIds ? [assigneeIds] : []);
+    const assignees = nextAssigneeIds
+      .map((assigneeId) => users.find((user) => user.id === assigneeId))
+      .filter(Boolean);
+    const primary = assignees[0] || null;
     setTickets((prev) => prev.map((ticket) => (
       ticket.id === ticketId
-        ? { ...ticket, assignee_id: assigneeId || null, assignee_username: assignee?.username || null }
+        ? { ...ticket, assignee_id: primary?.id || null, assignee_username: primary?.username || null, assignees }
         : ticket
     )));
     const res = await apiFetch(`/api/tickets/${ticketId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ assignee_id: assigneeId || null }),
+      body: JSON.stringify({ assignee_ids: nextAssigneeIds }),
     });
     if (!res.ok) fetchTickets();
   }
@@ -224,7 +253,7 @@ export default function Board({ sprintId, currentUser }) {
   }
 
   const visibleTickets = view === 'mine' && currentUser
-    ? tickets.filter((t) => t.assignee_id === currentUser.id)
+    ? tickets.filter((t) => t.assignee_id === currentUser.id || t.assignees?.some((assignee) => assignee.id === currentUser.id))
     : tickets;
 
   // Build swimlane groups
@@ -232,7 +261,7 @@ export default function Board({ sprintId, currentUser }) {
     if (swimlane === 'assignee') {
       const groups = new Map();
       for (const t of visibleTickets) {
-        const key = t.assignee_id || 'unassigned';
+        const key = t.assignee_id || t.assignees?.[0]?.id || 'unassigned';
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key).push(t);
       }
@@ -265,7 +294,7 @@ export default function Board({ sprintId, currentUser }) {
   const lanes = swimlane !== 'none' ? buildLanes() : [];
 
   return (
-    <>
+    <div className={`board-shell${swimlane !== 'none' ? ' board-shell-swimlanes' : ''}`}>
       <div className="board-toolbar" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
         <div className="btn-group">
           <Button type="button" size="sm" variant={view === 'all' ? 'default' : 'outline'} onClick={() => setView('all')}>Whole Sprint</Button>
@@ -321,7 +350,7 @@ export default function Board({ sprintId, currentUser }) {
             {lanes.map((lane) => (
               <div key={lane.key} className="swimlane">
                 <div className="swimlane-label">{lane.label}</div>
-                <div className="board">
+                <div className="board" onWheel={handleBoardWheel}>
                   {STATUSES.map((status) => (
                     <BoardColumn
                       key={`${lane.key}-${status.value}`}
@@ -352,7 +381,7 @@ export default function Board({ sprintId, currentUser }) {
                 </span>
               </div>
             )}
-            <div className={`board${loaded && !visibleTickets.length ? ' board-empty' : ''}`}>
+            <div className={`board${loaded && !visibleTickets.length ? ' board-empty' : ''}`} onWheel={handleBoardWheel}>
               {STATUSES.map((status) => (
                 <BoardColumn
                   key={status.value}
@@ -390,6 +419,6 @@ export default function Board({ sprintId, currentUser }) {
         />
       )}
       <ToastContainer toasts={toasts} />
-    </>
+    </div>
   );
 }

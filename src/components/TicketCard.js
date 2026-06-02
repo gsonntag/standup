@@ -3,20 +3,64 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { isOverdue, daysUntil } from '@/lib/dates';
+import { PRIORITIES, STATUSES } from '@/lib/constants';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  ArrowDownIcon,
+  ArrowUpIcon,
+  CircleIcon,
+  FireIcon,
+  FlagIcon,
+  KanbanIcon,
+  RocketLaunchIcon,
+  SpinnerGapIcon,
+  TimerIcon,
+  UserPlusIcon,
+} from '@phosphor-icons/react';
+
+const STATUS_ICONS = {
+  backlog: KanbanIcon,
+  todo: CircleIcon,
+  in_progress: SpinnerGapIcon,
+  in_review: TimerIcon,
+  done: RocketLaunchIcon,
+};
+
+const PRIORITY_ICONS = {
+  low: ArrowDownIcon,
+  medium: FlagIcon,
+  high: ArrowUpIcon,
+  urgent: FireIcon,
+};
 
 export default function TicketCard({ ticket, users, onAssign, onView }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: ticket.id });
   const style = { transform: CSS.Transform.toString(transform), transition };
   const hasUnresolvedBlockers = ticket.unresolved_blocker_count > 0;
+  const assignees = ticket.assignees?.length
+    ? ticket.assignees
+    : ticket.assignee_id
+      ? [{ id: ticket.assignee_id, username: ticket.assignee_username }]
+      : [];
+  const statusMeta = STATUSES.find((status) => status.value === ticket.status);
+  const priorityMeta = PRIORITIES.find((priority) => priority.value === ticket.priority);
+  const StatusIcon = STATUS_ICONS[ticket.status] || CircleIcon;
+  const PriorityIcon = PRIORITY_ICONS[ticket.priority] || FlagIcon;
 
-  function handleAction(e, action) {
-    e.preventDefault();
-    e.stopPropagation();
-    action();
+  function toggleAssignee(userId) {
+    const selected = new Set(assignees.map((assignee) => assignee.id));
+    if (selected.has(userId)) selected.delete(userId);
+    else selected.add(userId);
+    onAssign([...selected]);
   }
 
   return (
@@ -24,43 +68,57 @@ export default function TicketCard({ ticket, users, onAssign, onView }) {
       ref={setNodeRef}
       style={style}
       className={`ticket-card ${isDragging ? 'dragging' : ''}`}
+      onClick={() => {
+        if (!isDragging) onView();
+      }}
       {...attributes}
       {...listeners}
     >
       <CardHeader className="ticket-card-header">
-        <div className="ticket-card-number">#{ticket.number}</div>
+        <div className="ticket-card-number">
+          <span>#{ticket.number}</span>
+          <Badge className={`status-badge status-badge-${ticket.status}`} variant="outline">
+            <StatusIcon weight="bold" />
+            {statusMeta?.label || ticket.status}
+          </Badge>
+        </div>
         <div className="ticket-card-actions">
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => handleAction(e, onView)}
-          >
-            View
-          </Button>
-          <Select
-            value={ticket.assignee_id || 'unassigned'}
-            onPointerDown={(e) => e.stopPropagation()}
-            onValueChange={(value) => onAssign(value === 'unassigned' ? '' : value)}
-          >
-            <SelectTrigger className="ticket-card-assignee-select">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-            <SelectItem value="unassigned">Unassigned</SelectItem>
-            {users.map((user) => (
-              <SelectItem key={user.id} value={user.id}>{user.username}</SelectItem>
-            ))}
-            </SelectContent>
-          </Select>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="ticket-card-assignee-trigger"
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <UserPlusIcon weight="bold" />
+                {assignees.length || 'Assign'}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="ticket-card-assignee-menu" onPointerDown={(e) => e.stopPropagation()}>
+              <DropdownMenuLabel>Assignees</DropdownMenuLabel>
+              {users.map((user) => (
+                <DropdownMenuCheckboxItem
+                  key={user.id}
+                  checked={assignees.some((assignee) => assignee.id === user.id)}
+                  onCheckedChange={() => toggleAssignee(user.id)}
+                  onSelect={(e) => e.preventDefault()}
+                >
+                  @{user.username}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </CardHeader>
       <CardContent>
       <div className="ticket-card-title">{ticket.title}</div>
       <div className="ticket-card-meta">
         <Badge className={`priority-badge priority-badge-${ticket.priority}`} variant="outline">
-          {ticket.priority}
+          <PriorityIcon weight="bold" />
+          {priorityMeta?.label || ticket.priority}
         </Badge>
         <span className="label-list">
           {ticket.labels?.map((label) => (
@@ -85,11 +143,15 @@ export default function TicketCard({ ticket, users, onAssign, onView }) {
             {ticket.points_remaining ?? ticket.total_points} pt. left
           </Badge>
         )}
-        {ticket.assignee_username && (
-          <span className="ticket-card-assignee" title={ticket.assignee_username}>
-            {ticket.assignee_username.slice(0, 2)}
-          </span>
-        )}
+        <span className="ticket-card-assignee-stack" aria-label={assignees.length ? 'Assignees' : 'Unassigned'}>
+          {assignees.slice(0, 3).map((assignee) => (
+            <span key={assignee.id} className="ticket-card-assignee" title={assignee.username}>
+              {assignee.username?.slice(0, 2)}
+            </span>
+          ))}
+          {assignees.length > 3 && <span className="ticket-card-assignee-more">+{assignees.length - 3}</span>}
+          {!assignees.length && <span className="ticket-card-unassigned">Unassigned</span>}
+        </span>
       </div>
       </CardContent>
     </Card>

@@ -189,7 +189,21 @@ db.exec(`
     user_id   TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     PRIMARY KEY (ticket_id, user_id)
   );
+
+  CREATE TABLE IF NOT EXISTS ticket_assignees (
+    ticket_id TEXT NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+    user_id   TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    PRIMARY KEY (ticket_id, user_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_ticket_assignees_user ON ticket_assignees(user_id);
 `);
+
+db.prepare(`
+  INSERT OR IGNORE INTO ticket_assignees (ticket_id, user_id)
+  SELECT id, assignee_id
+  FROM tickets
+  WHERE assignee_id IS NOT NULL
+`).run();
 
 // retro_notes table
 db.exec(`
