@@ -20,9 +20,10 @@ export default async function RootLayout({ children }) {
             __html: `
               (function() {
                 try {
-                  localStorage.setItem('standup-theme', 'light');
-                  document.documentElement.dataset.theme = 'light';
-                  document.documentElement.classList.remove('dark');
+                  var savedTheme = localStorage.getItem('standup-theme');
+                  var theme = savedTheme === 'dark' ? 'dark' : 'light';
+                  document.documentElement.dataset.theme = theme;
+                  document.documentElement.classList.toggle('dark', theme === 'dark');
                 } catch (_) {
                   document.documentElement.dataset.theme = 'light';
                   document.documentElement.classList.remove('dark');

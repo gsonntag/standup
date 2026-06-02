@@ -13,9 +13,11 @@ import {
   KanbanIcon,
   ListChecksIcon,
   MagnifyingGlassIcon,
+  MoonIcon,
   RowsIcon,
   SidebarSimpleIcon,
   SignOutIcon,
+  SunIcon,
   TicketIcon,
   UsersIcon,
 } from '@phosphor-icons/react';
@@ -36,6 +38,7 @@ export default function Navbar({ user }) {
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [unreadCount, setUnreadCount] = useState(0);
   const [collapsed, setCollapsed] = useState(false);
+  const [theme, setTheme] = useState('light');
   const debounceRef = useRef(null);
   const containerRef = useRef(null);
   const searchInputRef = useRef(null);
@@ -71,10 +74,22 @@ export default function Navbar({ user }) {
   }, []);
 
   useEffect(() => {
-    window.localStorage.setItem('standup-theme', 'light');
-    document.documentElement.dataset.theme = 'light';
-    document.documentElement.classList.remove('dark');
+    const savedTheme = window.localStorage.getItem('standup-theme');
+    const nextTheme = savedTheme === 'dark' ? 'dark' : 'light';
+    setTheme(nextTheme);
+    document.documentElement.dataset.theme = nextTheme;
+    document.documentElement.classList.toggle('dark', nextTheme === 'dark');
   }, []);
+
+  function toggleTheme() {
+    setTheme((current) => {
+      const nextTheme = current === 'dark' ? 'light' : 'dark';
+      window.localStorage.setItem('standup-theme', nextTheme);
+      document.documentElement.dataset.theme = nextTheme;
+      document.documentElement.classList.toggle('dark', nextTheme === 'dark');
+      return nextTheme;
+    });
+  }
 
   useEffect(() => {
     document.body.classList.toggle('sidebar-collapsed', collapsed);
@@ -122,6 +137,8 @@ export default function Navbar({ user }) {
     router.push('/login');
     router.refresh();
   }
+
+  if (pathname === '/login') return null;
 
   return (
     <nav className="navbar app-sidebar" data-collapsed={collapsed}>
@@ -186,23 +203,33 @@ export default function Navbar({ user }) {
               <link.icon weight="bold" />
               <span className="sidebar-label">{link.label}</span>
               {link.href === '/my-tasks' && unreadCount > 0 && (
-                <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px]">{unreadCount}</Badge>
+                <Badge variant="secondary" className="sidebar-nav-badge ml-1 h-5 px-1.5 text-[10px]">{unreadCount}</Badge>
               )}
             </a>
           </li>
         ))}
       </ul>
       <div className="sidebar-secondary">
-        {user.role === 'admin' && (
-          <a href="/dashboard" className={pathname === '/dashboard' ? 'active' : ''} title="Dashboard">
-            <ChartBarIcon weight="bold" />
-            <span className="sidebar-label">Dashboard</span>
-          </a>
-        )}
+        <a href="/dashboard" className={pathname === '/dashboard' ? 'active' : ''} title="Dashboard">
+          <ChartBarIcon weight="bold" />
+          <span className="sidebar-label">Dashboard</span>
+        </a>
         <a href="/team" className={pathname === '/team' ? 'active' : ''} title="Team">
           <UsersIcon weight="bold" />
           <span className="sidebar-label">Team</span>
         </a>
+        <Button
+          type="button"
+          variant="ghost"
+          className="sidebar-theme-toggle"
+          onClick={toggleTheme}
+          title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        >
+          <span className="theme-toggle-icon">
+            {theme === 'dark' ? <SunIcon weight="bold" /> : <MoonIcon weight="bold" />}
+          </span>
+          <span className="sidebar-label">{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
+        </Button>
       </div>
       <div className="navbar-right">
         <DropdownMenu>

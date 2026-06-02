@@ -356,19 +356,14 @@ export default function Board({ sprintId, currentUser }) {
     const columnBody = event.target.closest?.('.board-column-body');
     const deltaY = event.deltaY || 0;
     const deltaX = event.deltaX || 0;
+    const horizontalDelta = Math.abs(deltaX) >= 1 ? deltaX : 0;
     const canScrollBoard = board.scrollWidth > board.clientWidth + 1;
     if (!canScrollBoard) return;
 
-    if (columnBody && board.contains(columnBody) && Math.abs(deltaY) > Math.abs(deltaX)) {
-      const canScrollColumn = columnBody.scrollHeight > columnBody.clientHeight + 1;
-      const atTop = columnBody.scrollTop <= 0;
-      const atBottom = columnBody.scrollTop + columnBody.clientHeight >= columnBody.scrollHeight - 1;
-      if (canScrollColumn && ((deltaY < 0 && !atTop) || (deltaY > 0 && !atBottom))) {
-        return;
-      }
+    if (!horizontalDelta && columnBody && board.contains(columnBody)) {
+      return;
     }
 
-    const horizontalDelta = deltaX || deltaY;
     if (!horizontalDelta) return;
     event.preventDefault();
     board.scrollLeft += horizontalDelta;

@@ -6,7 +6,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { apiFetch } from '@/lib/client-api';
-import { PRIORITIES } from '@/lib/constants';
+import { PRIORITIES, STATUSES } from '@/lib/constants';
 import { labelPillStyle } from '@/lib/labels';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -207,6 +207,12 @@ export default function BacklogView() {
     fetchTickets(0, filters, scope, nextSort);
   }
 
+  function handleSortChange(nextSort) {
+    setSort(nextSort);
+    setOffset(0);
+    fetchTickets(0, filters, scope, nextSort);
+  }
+
   async function moveToSprint(ticketId, sprintId) {
     if (!sprintId) return;
     const newSprintId = sprintId === 'backlog' ? null : sprintId;
@@ -361,13 +367,16 @@ export default function BacklogView() {
           onCancel={() => setShowCreateForm(false)}
         />
       )}
-      <TicketFilterBar
-        filters={filters}
-        onChange={handleFiltersChange}
-        users={users}
-        labels={labels}
-        priorities={PRIORITIES}
-      />
+            <TicketFilterBar
+              filters={filters}
+              onChange={handleFiltersChange}
+              users={users}
+              labels={labels}
+              priorities={PRIORITIES}
+              statuses={STATUSES}
+              sort={sort}
+              onSortChange={handleSortChange}
+            />
       {selected.size > 0 && (
         <div className="bulk-bar">
           <span>{selected.size} selected</span>
@@ -395,7 +404,7 @@ export default function BacklogView() {
                   />
                 </TableHead>
                 <TableHead style={{ width: 36 }} aria-label="Reorder" />
-                <SortHeader label="Ticket" value="number" sort={sort} onSort={handleSort} className="backlog-title-col" />
+                <SortHeader label="Ticket #" value="number" sort={sort} onSort={handleSort} className="backlog-title-col" />
                 <SortHeader label="Priority" value="priority" sort={sort} onSort={handleSort} style={{ width: 120 }} />
                 <SortHeader label="Assignee" value="assignee" sort={sort} onSort={handleSort} style={{ width: 140 }} />
                 <TableHead style={{ width: 180 }}>Labels</TableHead>
