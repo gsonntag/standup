@@ -9,6 +9,7 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const IMAGE_TYPES = new Map([
   ['image/gif', 'gif'],
   ['image/jpeg', 'jpg'],
+  ['image/jpg', 'jpg'],
   ['image/png', 'png'],
   ['image/webp', 'webp'],
 ]);

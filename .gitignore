@@ -6,3 +6,5 @@ data/*.db-wal
 .agent/CONTINUITY.md
 .env.local
 AGENTS.md
+public/uploads/
+scratch/

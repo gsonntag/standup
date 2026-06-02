@@ -14,10 +14,17 @@ export async function uploadImageFiles(files, { ticketId = null } = {}) {
     method: 'POST',
     body: formData,
   });
-  const data = await res.json();
   if (!res.ok) {
-    throw new Error(data.error || 'Failed to upload images.');
+    let errMsg = 'Failed to upload images.';
+    try {
+      const data = await res.json();
+      errMsg = data.error || errMsg;
+    } catch (_) {
+      // Fallback for HTML error pages or non-JSON payloads
+    }
+    throw new Error(errMsg);
   }
+  const data = await res.json();
   return data.markdown;
 }
 

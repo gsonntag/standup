@@ -310,7 +310,8 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
   }
 
   function handleDescriptionPaste(e) {
-    uploadPastedImage(e, (markdown) => insertDescriptionImage(markdown, e.currentTarget), { ticketId: activeTicketId });
+    const target = e.currentTarget;
+    uploadPastedImage(e, (markdown) => insertDescriptionImage(markdown, target), { ticketId: activeTicketId });
   }
 
   async function removeDependency(dependsOnId) {

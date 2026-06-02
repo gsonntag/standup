@@ -135,7 +135,8 @@ export default function CreateTicketForm({ users, onCreated, onCancel }) {
   }
 
   function handleDescriptionPaste(e) {
-    uploadPastedImage(e, (markdown) => insertDescriptionImage(markdown, e.currentTarget));
+    const target = e.currentTarget;
+    uploadPastedImage(e, (markdown) => insertDescriptionImage(markdown, target));
   }
 
   return (
