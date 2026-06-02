@@ -24,6 +24,8 @@ import {
   UsersIcon,
   RocketLaunchIcon,
   ActivityIcon,
+  ArrowUpIcon,
+  ArrowDownIcon,
 } from '@phosphor-icons/react';
 import { parseTimestamp, timeAgo } from '@/lib/dates';
 import AppPageHeader from './AppPageHeader';
@@ -554,7 +556,11 @@ export default function DashboardView() {
               <SelectValue placeholder="Select sprint" />
             </SelectTrigger>
             <SelectContent>
-              {!sprints.length && <SelectItem value="none">No sprints</SelectItem>}
+              {sprints.length === 0 ? (
+                <SelectItem value="none">No sprints</SelectItem>
+              ) : (
+                <SelectItem value="none">Select sprint...</SelectItem>
+              )}
               {sprints.map((s) => (
                 <SelectItem key={s.id} value={s.id}>
                   {s.name}
