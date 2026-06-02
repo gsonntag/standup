@@ -15,6 +15,17 @@ export const STATUSES = [
   { value: 'done', label: 'Prod' },
 ];
 
+// Ticket mental-model rules. A ticket in the backlog (status 'backlog') has no
+// sprint: it cannot be assigned, given a due date, or moved out of backlog except
+// by adding it to a sprint. Reviewers only exist once work reaches PR/Prod.
+// Watchers, priority, points, labels, and dependencies can change at any time.
+export const ticketRules = {
+  canAssign: (status) => status !== 'backlog',
+  canHaveReviewers: (status) => status === 'in_review' || status === 'done',
+  canSetDueDate: (sprintId) => !!sprintId,
+  canChangeStatus: (status) => status !== 'backlog',
+};
+
 export const PRIORITIES = [
   { value: 'low', label: 'Low' },
   { value: 'medium', label: 'Medium' },

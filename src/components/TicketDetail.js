@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { apiFetch } from '@/lib/client-api';
-import { PRIORITIES, STATUSES } from '@/lib/constants';
+import { PRIORITIES, STATUSES, ticketRules } from '@/lib/constants';
 import { parseTimestamp, timeAgo } from '@/lib/dates';
 import { uploadPastedImage } from '@/lib/description-paste';
 import { uploadImageFiles } from '@/lib/upload-image';
@@ -482,6 +482,10 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
       : [];
   const HeaderStatusIcon = STATUS_ICONS[ticket.status] || CircleIcon;
   const HeaderPriorityIcon = PRIORITY_ICONS[ticket.priority] || FlagIcon;
+  const inSprint = !!ticket.sprint_id;
+  const inBacklog = ticket.status === 'backlog';
+  const canAssign = ticketRules.canAssign(ticket.status);
+  const canReview = ticketRules.canHaveReviewers(ticket.status);
 
   // Merge events and comments for the activity section
   const activityItems = [
@@ -751,6 +755,45 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
           <aside className="ticket-detail-sidebar-modern">
             <div className="ticket-property-card">
               <div className="ticket-property-header">
+                <GitForkIcon weight="bold" />
+                Planning
+              </div>
+              <div className="ticket-property-field">
+                <Label>Sprint</Label>
+                <Select value={ticket.sprint_id || 'backlog'} onValueChange={(value) => updateField('sprint_id', value === 'backlog' ? '' : value)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="backlog">Backlog</SelectItem>
+                    {sprints.filter((sprint) => sprint.status !== 'completed').map((sprint) => (
+                      <SelectItem key={sprint.id} value={sprint.id}>{sprint.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="ticket-property-field">
+                <Label>Repository</Label>
+                <Select value={ticket.github_repo_id || 'none'} onValueChange={(value) => updateField('github_repo_id', value === 'none' ? '' : value)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No repository</SelectItem>
+                    {repositories.map((repo) => <SelectItem key={repo.id} value={repo.id}>{repo.full_name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {ticket.github_repository && (
+                  <a href={ticket.github_repository.html_url} target="_blank" rel="noopener noreferrer" className="ticket-external-link">
+                    <LinkIcon weight="bold" />
+                    Open repository
+                  </a>
+                )}
+              </div>
+              <div className="ticket-property-field">
+                <Label><TagIcon weight="bold" /> Labels</Label>
+                <LabelPicker ticketId={activeTicketId} currentLabels={ticket.labels || []} onUpdate={fetchTicket} />
+              </div>
+            </div>
+
+            <div className="ticket-property-card">
+              <div className="ticket-property-header">
                 <UserCircleIcon weight="bold" />
                 People
               </div>
@@ -760,35 +803,43 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
               </div>
               <div className="ticket-property-field">
                 <Label>Assignees</Label>
-                <div className="ticket-assignee-check-list">
-                  {users.map((user) => (
-                    <button
-                      key={user.id}
-                      type="button"
-                      className="ticket-assignee-check-row"
-                      onClick={() => toggleAssignee(user.id)}
-                    >
-                      <Checkbox checked={assignees.some((assignee) => assignee.id === user.id)} aria-hidden="true" tabIndex={-1} />
-                      <span>@{user.username}</span>
-                    </button>
-                  ))}
-                </div>
+                {canAssign ? (
+                  <div className="ticket-assignee-check-list">
+                    {users.map((user) => (
+                      <button
+                        key={user.id}
+                        type="button"
+                        className="ticket-assignee-check-row"
+                        onClick={() => toggleAssignee(user.id)}
+                      >
+                        <Checkbox checked={assignees.some((assignee) => assignee.id === user.id)} aria-hidden="true" tabIndex={-1} />
+                        <span>@{user.username}</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="ticket-property-hint">Add this ticket to a sprint before assigning it.</p>
+                )}
               </div>
               <div className="ticket-property-field">
                 <Label>Reviewers</Label>
-                <div className="ticket-assignee-check-list">
-                  {users.map((user) => (
-                    <button
-                      key={user.id}
-                      type="button"
-                      className="ticket-assignee-check-row"
-                      onClick={() => toggleReviewer(user.id)}
-                    >
-                      <Checkbox checked={ticket.reviewers?.some((reviewer) => reviewer.id === user.id)} aria-hidden="true" tabIndex={-1} />
-                      <span>@{user.username}</span>
-                    </button>
-                  ))}
-                </div>
+                {canReview ? (
+                  <div className="ticket-assignee-check-list">
+                    {users.map((user) => (
+                      <button
+                        key={user.id}
+                        type="button"
+                        className="ticket-assignee-check-row"
+                        onClick={() => toggleReviewer(user.id)}
+                      >
+                        <Checkbox checked={ticket.reviewers?.some((reviewer) => reviewer.id === user.id)} aria-hidden="true" tabIndex={-1} />
+                        <span>@{user.username}</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="ticket-property-hint">Reviewers can be added once the ticket reaches PR or Prod.</p>
+                )}
                 {!!ticket.reviewers?.length && (
                   <div className="ticket-pill-list">
                     {ticket.reviewers.map((reviewer) => (
@@ -834,10 +885,10 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
               </div>
               <div className="ticket-property-field">
                 <Label>Status</Label>
-                <Select value={ticket.status} onValueChange={handleStatusChange}>
+                <Select value={ticket.status} onValueChange={handleStatusChange} disabled={inBacklog}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {STATUSES.map((status) => {
+                    {STATUSES.filter((status) => status.value !== 'backlog' || inBacklog).map((status) => {
                       const StatusIcon = STATUS_ICONS[status.value] || CircleIcon;
                       return (
                         <SelectItem key={status.value} value={status.value}>
@@ -850,6 +901,7 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
                     })}
                   </SelectContent>
                 </Select>
+                {inBacklog && <p className="ticket-property-hint">Add this ticket to a sprint to start progress.</p>}
               </div>
               <div className="ticket-property-field">
                 <Label>Priority</Label>
@@ -906,52 +958,19 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
               </div>
               <div className="ticket-property-field">
                 <Label>Due date</Label>
-                <Input type="date" value={ticket.due_date || ''} onChange={(e) => updateField('due_date', e.target.value || null)} />
-                <div className="ticket-detail-shortcuts">
-                  {sprintEndDate && <Button type="button" size="xs" variant="outline" onClick={() => updateField('due_date', sprintEndDate)}><CalendarBlankIcon weight="bold" />End of sprint</Button>}
-                  <Button type="button" size="xs" variant="outline" onClick={() => updateField('due_date', dateFromToday(0))}>Today</Button>
-                  <Button type="button" size="xs" variant="outline" onClick={() => updateField('due_date', dateFromToday(1))}>+1</Button>
-                  <Button type="button" size="xs" variant="outline" onClick={() => updateField('due_date', dateFromToday(7))}>+7</Button>
-                </div>
-              </div>
-            </div>
-
-            <div className="ticket-property-card">
-              <div className="ticket-property-header">
-                <GitForkIcon weight="bold" />
-                Planning
-              </div>
-              <div className="ticket-property-field">
-                <Label>Sprint</Label>
-                <Select value={ticket.sprint_id || 'backlog'} onValueChange={(value) => updateField('sprint_id', value === 'backlog' ? '' : value)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="backlog">Backlog</SelectItem>
-                    {sprints.filter((sprint) => sprint.status !== 'completed').map((sprint) => (
-                      <SelectItem key={sprint.id} value={sprint.id}>{sprint.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="ticket-property-field">
-                <Label>Repository</Label>
-                <Select value={ticket.github_repo_id || 'none'} onValueChange={(value) => updateField('github_repo_id', value === 'none' ? '' : value)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No repository</SelectItem>
-                    {repositories.map((repo) => <SelectItem key={repo.id} value={repo.id}>{repo.full_name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                {ticket.github_repository && (
-                  <a href={ticket.github_repository.html_url} target="_blank" rel="noopener noreferrer" className="ticket-external-link">
-                    <LinkIcon weight="bold" />
-                    Open repository
-                  </a>
+                {inSprint ? (
+                  <>
+                    <Input type="date" value={ticket.due_date || ''} onChange={(e) => updateField('due_date', e.target.value || null)} />
+                    <div className="ticket-detail-shortcuts">
+                      {sprintEndDate && <Button type="button" size="xs" variant="outline" onClick={() => updateField('due_date', sprintEndDate)}><CalendarBlankIcon weight="bold" />End of sprint</Button>}
+                      <Button type="button" size="xs" variant="outline" onClick={() => updateField('due_date', dateFromToday(0))}>Today</Button>
+                      <Button type="button" size="xs" variant="outline" onClick={() => updateField('due_date', dateFromToday(1))}>+1</Button>
+                      <Button type="button" size="xs" variant="outline" onClick={() => updateField('due_date', dateFromToday(7))}>+7</Button>
+                    </div>
+                  </>
+                ) : (
+                  <p className="ticket-property-hint">A due date can be set once this ticket is in a sprint.</p>
                 )}
-              </div>
-              <div className="ticket-property-field">
-                <Label><TagIcon weight="bold" /> Labels</Label>
-                <LabelPicker ticketId={activeTicketId} currentLabels={ticket.labels || []} onUpdate={fetchTicket} />
               </div>
             </div>
 

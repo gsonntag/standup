@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import { jsonError, withAuth } from '@/lib/api';
 import { getDb } from '@/lib/db';
-import { PRIORITIES, STATUSES } from '@/lib/constants';
+import { PRIORITIES, STATUSES, ticketRules } from '@/lib/constants';
 import { getTicketById } from '../route';
 import { publish } from '@/lib/events';
 import {
@@ -201,6 +201,25 @@ export const PATCH = withAuth(async (request, user, context) => {
     args.push(value);
   }
 
+  // Sprint membership defines the backlog boundary: a ticket with no sprint sits in
+  // the backlog (status 'backlog'); adding it to a sprint starts it at 'todo'. Only
+  // applied when the caller did not set status explicitly.
+  if ('sprint_id' in body && !('status' in body)) {
+    const newSprintId = body.sprint_id || null;
+    const oldSprintId = existing.sprint_id || null;
+    if (newSprintId !== oldSprintId) {
+      let coupledStatus = null;
+      if (!newSprintId && existing.status !== 'backlog') coupledStatus = 'backlog';
+      else if (newSprintId && existing.status === 'backlog') coupledStatus = 'todo';
+      if (coupledStatus) {
+        changedFieldDetails.push({ field: FIELD_LABELS.status, oldValue: existing.status, newValue: coupledStatus });
+        sets.push('status = ?');
+        args.push(coupledStatus);
+        nextStatus = coupledStatus;
+      }
+    }
+  }
+
   // When a ticket is moved into a sprint, default its due date to the sprint end date
   // (unless the request explicitly sets a due date).
   if ('sprint_id' in body && (body.sprint_id || null) && !('due_date' in body)) {
@@ -241,7 +260,7 @@ export const PATCH = withAuth(async (request, user, context) => {
     args.push(nextPointsRemaining);
   }
 
-  if ('points_remaining' in body && !('status' in body) && nextPointsRemaining === 0 && nextStatus !== 'done' && nextStatus !== 'in_review') {
+  if ('points_remaining' in body && !('status' in body) && nextPointsRemaining === 0 && nextStatus !== 'done' && nextStatus !== 'in_review' && nextStatus !== 'backlog') {
     const previousValue = existing.status ?? null;
     nextStatus = 'in_review';
     const statusSetIndex = sets.findIndex((set) => set === 'status = ?');
@@ -261,6 +280,21 @@ export const PATCH = withAuth(async (request, user, context) => {
     } else {
       changedFieldDetails.push({ field: FIELD_LABELS.status, oldValue: previousValue, newValue: nextStatus });
     }
+  }
+
+  // Enforce the ticket mental model against the resulting state.
+  const finalSprintId = 'sprint_id' in body ? (body.sprint_id || null) : (existing.sprint_id || null);
+  if (assignmentRequested && nextAssigneeIds.length && !ticketRules.canAssign(nextStatus)) {
+    return jsonError('Backlog tickets cannot be assigned. Add the ticket to a sprint first.');
+  }
+  if (reviewersRequested && nextReviewerIds.length && !ticketRules.canHaveReviewers(nextStatus)) {
+    return jsonError('Reviewers can only be set while a ticket is in PR or Prod.');
+  }
+  if ('due_date' in body && body.due_date && !ticketRules.canSetDueDate(finalSprintId)) {
+    return jsonError('Due dates can only be set once a ticket is in a sprint.');
+  }
+  if ('status' in body && existing.status === 'backlog' && nextStatus !== 'backlog' && !finalSprintId) {
+    return jsonError('Backlog tickets must be added to a sprint before changing status.');
   }
 
   if (nextPointsRemaining != null && nextTotalPoints == null) {

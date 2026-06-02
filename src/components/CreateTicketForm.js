@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/client-api';
-import { PRIORITIES, STATUSES, TICKET_TEMPLATE } from '@/lib/constants';
+import { PRIORITIES, STATUSES, TICKET_TEMPLATE, ticketRules } from '@/lib/constants';
 import { uploadPastedImage } from '@/lib/description-paste';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -62,6 +62,20 @@ export default function CreateTicketForm({ users, onCreated, onCancel }) {
       .then((res) => res.json())
       .then((data) => setTickets(data.tickets || []));
   }, []);
+
+  // Sprint membership defines the backlog boundary: a ticket with no sprint stays in
+  // the backlog and cannot be assigned or given a due date.
+  function handleSprintChange(value) {
+    const next = value === 'backlog' ? '' : value;
+    setSprintId(next);
+    if (!next) {
+      setStatus('backlog');
+      setAssigneeIds(new Set());
+      setDueDate('');
+    } else if (status === 'backlog') {
+      setStatus('todo');
+    }
+  }
 
   function toggleSetValue(setter, id) {
     setter((prev) => {
@@ -198,34 +212,8 @@ export default function CreateTicketForm({ users, onCreated, onCancel }) {
                   </SelectContent>
                 </Select>
               </AppField>
-              <AppField id="ticket-status" label="Status" icon={ListChecksIcon}>
-                <Select value={status} onValueChange={setStatus}>
-                  <SelectTrigger id="ticket-status">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {STATUSES.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </AppField>
-              <AppField id="ticket-assignee" label="Assignees" icon={UserCircleIcon}>
-                <div className="create-ticket-check-list create-ticket-assignee-list">
-                  {users.map((user) => (
-                    <button
-                      key={user.id}
-                      type="button"
-                      className="create-ticket-check-row"
-                      onClick={() => toggleSetValue(setAssigneeIds, user.id)}
-                    >
-                      <Checkbox checked={assigneeIds.has(user.id)} aria-hidden="true" tabIndex={-1} />
-                      <span>@{user.username}</span>
-                    </button>
-                  ))}
-                  {!users.length && <div className="ticket-detail-empty">No team members yet.</div>}
-                </div>
-              </AppField>
               <AppField id="ticket-sprint" label="Sprint" icon={GitForkIcon}>
-                <Select value={sprintId || 'backlog'} onValueChange={(value) => setSprintId(value === 'backlog' ? '' : value)}>
+                <Select value={sprintId || 'backlog'} onValueChange={handleSprintChange}>
                   <SelectTrigger id="ticket-sprint">
                     <SelectValue />
                   </SelectTrigger>
@@ -236,6 +224,37 @@ export default function CreateTicketForm({ users, onCreated, onCancel }) {
                     ))}
                   </SelectContent>
                 </Select>
+              </AppField>
+              <AppField id="ticket-status" label="Status" icon={ListChecksIcon}>
+                <Select value={status} onValueChange={setStatus} disabled={!sprintId}>
+                  <SelectTrigger id="ticket-status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATUSES.filter((item) => item.value !== 'backlog' || !sprintId).map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {!sprintId && <p className="ticket-property-hint">Add the ticket to a sprint to start progress.</p>}
+              </AppField>
+              <AppField id="ticket-assignee" label="Assignees" icon={UserCircleIcon}>
+                {ticketRules.canAssign(status) ? (
+                  <div className="create-ticket-check-list create-ticket-assignee-list">
+                    {users.map((user) => (
+                      <button
+                        key={user.id}
+                        type="button"
+                        className="create-ticket-check-row"
+                        onClick={() => toggleSetValue(setAssigneeIds, user.id)}
+                      >
+                        <Checkbox checked={assigneeIds.has(user.id)} aria-hidden="true" tabIndex={-1} />
+                        <span>@{user.username}</span>
+                      </button>
+                    ))}
+                    {!users.length && <div className="ticket-detail-empty">No team members yet.</div>}
+                  </div>
+                ) : (
+                  <p className="ticket-property-hint">Add the ticket to a sprint before assigning it.</p>
+                )}
               </AppField>
               <AppField id="ticket-github-repo" label="Repository" icon={GitBranchIcon}>
                 <Select value={githubRepoId || 'none'} onValueChange={(value) => setGithubRepoId(value === 'none' ? '' : value)}>
@@ -249,12 +268,16 @@ export default function CreateTicketForm({ users, onCreated, onCancel }) {
                 </Select>
               </AppField>
               <AppField id="ticket-due-date" label="Due Date" icon={FlagIcon}>
-                <Input
-                  id="ticket-due-date"
-                  type="date"
-                  value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
-                />
+                {ticketRules.canSetDueDate(sprintId) ? (
+                  <Input
+                    id="ticket-due-date"
+                    type="date"
+                    value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)}
+                  />
+                ) : (
+                  <p className="ticket-property-hint">A due date can be set once the ticket is in a sprint.</p>
+                )}
               </AppField>
               <div className="create-ticket-points">
                 <AppField id="ticket-total-points" label="Total Points" icon={HashIcon}>

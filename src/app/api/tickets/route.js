@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import { jsonError, withAuth } from '@/lib/api';
 import { getDb } from '@/lib/db';
-import { PRIORITIES, STATUSES } from '@/lib/constants';
+import { PRIORITIES, STATUSES, ticketRules } from '@/lib/constants';
 import { notifyTicketCreated } from '@/lib/discord';
 import { attachMarkdownImagesToTicket } from '@/lib/markdown-attachments';
 
@@ -298,10 +298,19 @@ export const POST = withAuth(async (request, user) => {
     return jsonError('points_remaining cannot exceed total_points.');
   }
   let status = requestedStatus || (sprintId ? 'todo' : 'backlog');
+  // Backlog boundary: no sprint means backlog; a sprinted ticket cannot be backlog.
+  if (!sprintId) status = 'backlog';
+  else if (status === 'backlog') status = 'todo';
 
   if (!title) return jsonError('Title is required.');
   if (!PRIORITY_VALUES.has(priority)) return jsonError('Invalid priority.');
   if (!STATUS_VALUES.has(status)) return jsonError('Invalid status.');
+  if (assigneeIds.length && !ticketRules.canAssign(status)) {
+    return jsonError('Backlog tickets cannot be assigned. Add the ticket to a sprint first.');
+  }
+  if (body.due_date && !ticketRules.canSetDueDate(sprintId)) {
+    return jsonError('Due dates can only be set once a ticket is in a sprint.');
+  }
   if (status === 'done' && totalPoints != null) pointsRemaining = 0;
   if (pointsRemaining === 0 && status !== 'done' && status !== 'in_review') status = 'in_review';
   let sprintEndDate = null;

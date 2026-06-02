@@ -3015,6 +3015,13 @@ body.sidebar-collapsed .page {
   font-weight: 750;
 }
 
+.ticket-property-hint {
+  margin: 0;
+  color: var(--jira-muted);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
 .ticket-property-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
