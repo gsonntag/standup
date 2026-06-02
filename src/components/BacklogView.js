@@ -7,17 +7,35 @@ import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { apiFetch } from '@/lib/client-api';
 import { PRIORITIES } from '@/lib/constants';
+import { labelPillStyle } from '@/lib/labels';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { DotsSixVerticalIcon, PlusIcon, TicketIcon } from '@phosphor-icons/react';
+import { CaretDownIcon, CaretUpIcon, DotsSixVerticalIcon, PlusIcon, TicketIcon } from '@phosphor-icons/react';
 import AppPageHeader from './AppPageHeader';
 import { AppEmptyState } from './AppUI';
 import CreateTicketForm from './CreateTicketForm';
 import TicketDetail from './TicketDetail';
 import TicketFilterBar from './TicketFilterBar';
+
+function SortHeader({ label, value, sort, onSort, className = '', style }) {
+  const active = sort.by === value;
+  const Icon = active && sort.dir === 'asc' ? CaretUpIcon : CaretDownIcon;
+  return (
+    <TableHead className={className} style={style}>
+      <button
+        type="button"
+        className={`ticket-sort-header${active ? ' active' : ''}`}
+        onClick={() => onSort(value)}
+      >
+        {label}
+        <Icon weight="bold" />
+      </button>
+    </TableHead>
+  );
+}
 
 function SortableRow({ ticket, movableSprints, allSprints, onView, onMoveToSprint, selected, onToggleSelect, showSprint, isMoving }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: ticket.id });
@@ -53,6 +71,7 @@ function SortableRow({ ticket, movableSprints, allSprints, onView, onMoveToSprin
       </TableCell>
       <TableCell className="backlog-title-cell">
         <div className="backlog-row-title">
+          <span className="ticket-number-pill">#{ticket.number}</span>
           {ticket.title}
         </div>
       </TableCell>
@@ -65,13 +84,13 @@ function SortableRow({ ticket, movableSprints, allSprints, onView, onMoveToSprin
       <TableCell>
         <span className="label-list">
           {ticket.labels?.map((label) => (
-            <span key={label.id} className="label" style={{ backgroundColor: label.color }}>{label.name}</span>
+            <span key={label.id} className="label" style={labelPillStyle(label.color)}>{label.name}</span>
           ))}
         </span>
       </TableCell>
       {showSprint && (
         <TableCell className="text-muted text-xs">
-          {ticket.sprint_id ? (allSprints.find((s) => String(s.id) === String(ticket.sprint_id))?.name || '—') : <em>Backlog</em>}
+          {ticket.sprint_id ? (ticket.sprint_name || allSprints.find((s) => String(s.id) === String(ticket.sprint_id))?.name || '—') : <em>Backlog</em>}
         </TableCell>
       )}
       <TableCell onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
@@ -83,13 +102,13 @@ function SortableRow({ ticket, movableSprints, allSprints, onView, onMoveToSprin
           }}
         >
           <SelectTrigger className="w-40">
-            <SelectValue placeholder={isMoving ? 'Moving...' : 'Move to sprint'} />
+            <SelectValue placeholder={isMoving ? 'Moving...' : 'Selected sprint'} />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="backlog">Backlog</SelectItem>
             {ticket.sprint_id && (
               <SelectItem value={String(ticket.sprint_id)} disabled>
-                {allSprints.find((s) => String(s.id) === String(ticket.sprint_id))?.name || 'Current sprint'}
+                {ticket.sprint_name || allSprints.find((s) => String(s.id) === String(ticket.sprint_id))?.name || 'Current sprint'}
               </SelectItem>
             )}
             {movableSprints
@@ -113,6 +132,7 @@ export default function BacklogView() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedTicketId, setSelectedTicketId] = useState(null);
   const [filters, setFilters] = useState({});
+  const [sort, setSort] = useState({ by: 'number', dir: 'desc' });
   const [scope, setScope] = useState('all');
   const [selected, setSelected] = useState(new Set());
   const [movingTicketId, setMovingTicketId] = useState(null);
@@ -120,22 +140,26 @@ export default function BacklogView() {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
-  function buildUrl(fetchOffset = 0, currentFilters = filters, currentScope = scope) {
+  function buildUrl(fetchOffset = 0, currentFilters = filters, currentScope = scope, currentSort = sort) {
     const params = new URLSearchParams();
     if (currentScope === 'backlog') {
       params.set('sprint_id', 'none');
-      params.set('exclude_status', 'done');
     }
+    if (!currentFilters.status) params.set('exclude_status', 'done');
     params.set('limit', '50');
     params.set('offset', String(fetchOffset));
     if (currentFilters.q) params.set('q', currentFilters.q);
     if (currentFilters.assignee_id) params.set('assignee_id', currentFilters.assignee_id);
     if (currentFilters.priority) params.set('priority', currentFilters.priority);
+    if (currentFilters.sprint_id) params.set('sprint_id', currentFilters.sprint_id);
+    if (currentFilters.status) params.set('status', currentFilters.status);
+    if (currentSort.by) params.set('sort_by', currentSort.by);
+    if (currentSort.dir) params.set('sort_dir', currentSort.dir);
     return `/api/tickets?${params.toString()}`;
   }
 
-  async function fetchTickets(fetchOffset = 0, currentFilters = filters, currentScope = scope) {
-    const res = await apiFetch(buildUrl(fetchOffset, currentFilters, currentScope));
+  async function fetchTickets(fetchOffset = 0, currentFilters = filters, currentScope = scope, currentSort = sort) {
+    const res = await apiFetch(buildUrl(fetchOffset, currentFilters, currentScope, currentSort));
     const data = await res.json();
     if (fetchOffset > 0) {
       setTickets((prev) => [...prev, ...(data.tickets || [])]);
@@ -160,7 +184,7 @@ export default function BacklogView() {
     setOffset(0);
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     debounceTimer.current = setTimeout(() => {
-      fetchTickets(0, newFilters, scope);
+      fetchTickets(0, newFilters, scope, sort);
     }, 200);
   }
 
@@ -168,7 +192,19 @@ export default function BacklogView() {
     setScope(newScope);
     setOffset(0);
     setSelected(new Set());
-    fetchTickets(0, filters, newScope);
+    fetchTickets(0, filters, newScope, sort);
+  }
+
+  function handleSort(nextBy) {
+    const nextSort = {
+      by: nextBy,
+      dir: sort.by === nextBy
+        ? (sort.dir === 'asc' ? 'desc' : 'asc')
+        : (nextBy === 'priority' || nextBy === 'number' ? 'desc' : 'asc'),
+    };
+    setSort(nextSort);
+    setOffset(0);
+    fetchTickets(0, filters, scope, nextSort);
   }
 
   async function moveToSprint(ticketId, sprintId) {
@@ -197,7 +233,7 @@ export default function BacklogView() {
       if (scope === 'all' && data.ticket) {
         setTickets((prev) => prev.map((t) => t.id === ticketId ? { ...t, ...data.ticket } : t));
       }
-      fetchTickets(0);
+      fetchTickets(0, filters, scope, sort);
     } catch (err) {
       setTickets(previousTickets);
       setTotal(previousTotal);
@@ -227,8 +263,8 @@ export default function BacklogView() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ position }),
     }).then((res) => {
-      if (!res.ok) fetchTickets(0);
-    }).catch(() => fetchTickets(0));
+      if (!res.ok) fetchTickets(0, filters, scope, sort);
+    }).catch(() => fetchTickets(0, filters, scope, sort));
   }
 
   function toggleSelectAll() {
@@ -259,7 +295,7 @@ export default function BacklogView() {
       });
     }
     setSelected(new Set());
-    fetchTickets(0);
+    fetchTickets(0, filters, scope, sort);
   }
 
   async function handleBulkDelete() {
@@ -270,7 +306,7 @@ export default function BacklogView() {
       body: JSON.stringify({ ids, delete: true }),
     });
     setSelected(new Set());
-    fetchTickets(0);
+    fetchTickets(0, filters, scope, sort);
   }
 
   const movableSprints = sprints.filter((sprint) => sprint.status === 'planning' || sprint.status === 'active');
@@ -337,7 +373,7 @@ export default function BacklogView() {
           <span>{selected.size} selected</span>
           <Select onValueChange={(value) => handleBulkAction('sprint', value)}>
             <SelectTrigger className="w-44">
-              <SelectValue placeholder="Move to sprint..." />
+              <SelectValue placeholder="Selected sprint..." />
             </SelectTrigger>
             <SelectContent>
               {movableSprints.map((s) => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}
@@ -359,12 +395,12 @@ export default function BacklogView() {
                   />
                 </TableHead>
                 <TableHead style={{ width: 36 }} aria-label="Reorder" />
-                <TableHead className="backlog-title-col">Title</TableHead>
-                <TableHead style={{ width: 120 }}>Priority</TableHead>
-                <TableHead style={{ width: 140 }}>Assignee</TableHead>
+                <SortHeader label="Ticket" value="number" sort={sort} onSort={handleSort} className="backlog-title-col" />
+                <SortHeader label="Priority" value="priority" sort={sort} onSort={handleSort} style={{ width: 120 }} />
+                <SortHeader label="Assignee" value="assignee" sort={sort} onSort={handleSort} style={{ width: 140 }} />
                 <TableHead style={{ width: 180 }}>Labels</TableHead>
-                {showSprint && <TableHead style={{ width: 160 }}>Sprint</TableHead>}
-                <TableHead style={{ width: 180 }}>Actions</TableHead>
+                {showSprint && <SortHeader label="Sprint" value="sprint" sort={sort} onSort={handleSort} style={{ width: 160 }} />}
+                <TableHead style={{ width: 180 }}>Selected sprint</TableHead>
               </TableRow>
             </TableHeader>
             <SortableContext items={tickets.map((t) => t.id)} strategy={verticalListSortingStrategy}>
@@ -417,7 +453,7 @@ export default function BacklogView() {
             onClick={() => {
               const nextOffset = offset + 50;
               setOffset(nextOffset);
-              fetchTickets(nextOffset);
+              fetchTickets(nextOffset, filters, scope, sort);
             }}
           >
             Load more ({tickets.length}/{total})
@@ -429,7 +465,7 @@ export default function BacklogView() {
           ticketId={selectedTicketId}
           onClose={({ deleted, updated } = {}) => {
             setSelectedTicketId(null);
-            if (deleted || updated) fetchTickets(0);
+            if (deleted || updated) fetchTickets(0, filters, scope, sort);
           }}
         />
       )}

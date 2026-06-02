@@ -2,8 +2,9 @@
 
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { isOverdue, daysUntil } from '@/lib/dates';
+import { isOverdue, daysUntil, parseTimestamp } from '@/lib/dates';
 import { PRIORITIES, STATUSES } from '@/lib/constants';
+import { labelPillStyle } from '@/lib/labels';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -42,7 +43,13 @@ const PRIORITY_ICONS = {
   urgent: FireIcon,
 };
 
-export default function TicketCard({ ticket, users, onAssign, onView }) {
+function formatShortDate(value) {
+  const date = parseTimestamp(value);
+  if (!date || Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(date);
+}
+
+export default function TicketCard({ ticket, users, onAssign, onView, onLabelClick }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: ticket.id });
   const style = { transform: CSS.Transform.toString(transform), transition };
   const hasUnresolvedBlockers = ticket.unresolved_blocker_count > 0;
@@ -55,6 +62,7 @@ export default function TicketCard({ ticket, users, onAssign, onView }) {
   const priorityMeta = PRIORITIES.find((priority) => priority.value === ticket.priority);
   const StatusIcon = STATUS_ICONS[ticket.status] || CircleIcon;
   const PriorityIcon = PRIORITY_ICONS[ticket.priority] || FlagIcon;
+  const createdDate = formatShortDate(ticket.created_at);
 
   function toggleAssignee(userId) {
     const selected = new Set(assignees.map((assignee) => assignee.id));
@@ -77,10 +85,6 @@ export default function TicketCard({ ticket, users, onAssign, onView }) {
       <CardHeader className="ticket-card-header">
         <div className="ticket-card-number">
           <span>#{ticket.number}</span>
-          <Badge className={`status-badge status-badge-${ticket.status}`} variant="outline">
-            <StatusIcon weight="bold" />
-            {statusMeta?.label || ticket.status}
-          </Badge>
         </div>
         <div className="ticket-card-actions">
           <DropdownMenu>
@@ -115,23 +119,41 @@ export default function TicketCard({ ticket, users, onAssign, onView }) {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="ticket-card-title">{ticket.title}</div>
+        <div className="ticket-card-title-row">
+          <span className={`ticket-card-status-icon status-icon-${ticket.status}`} title={statusMeta?.label || ticket.status}>
+            <StatusIcon weight="fill" />
+          </span>
+          <div className="ticket-card-title">{ticket.title}</div>
+        </div>
         <div className="ticket-card-label-row">
-          <Badge className={`priority-badge priority-badge-${ticket.priority}`} variant="outline">
+          <span className={`linear-priority-chip linear-priority-${ticket.priority}`} title={priorityMeta?.label || ticket.priority}>
+            <span className="linear-priority-dot" />
             <PriorityIcon weight="bold" />
             {priorityMeta?.label || ticket.priority}
-          </Badge>
-          <span className="label-list">
+          </span>
+          <span className="label-list linear-label-list">
             {ticket.labels?.map((label) => (
-              <span key={label.id} className="label" style={{ backgroundColor: label.color }}>
+              <button
+                key={label.id}
+                type="button"
+                className="label linear-label"
+                style={labelPillStyle(label.color)}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  (onLabelClick || onView)?.();
+                }}
+              >
+                <span className="linear-label-dot" />
                 {label.name}
-              </span>
+              </button>
             ))}
           </span>
           {hasUnresolvedBlockers && <Badge variant="destructive">Blocked</Badge>}
         </div>
         <div className="ticket-card-footer">
           <div className="ticket-card-footer-meta">
+            {createdDate && <span className="ticket-card-muted-meta">Created {createdDate}</span>}
             {ticket.total_points != null && (
               <Badge variant="secondary" title="Points remaining">
                 {ticket.points_remaining ?? ticket.total_points} pt. left

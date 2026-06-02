@@ -3,7 +3,6 @@
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import TicketCard from './TicketCard';
 import { CircleIcon, KanbanIcon, RocketLaunchIcon, SpinnerGapIcon, TimerIcon } from '@phosphor-icons/react';
 
@@ -27,8 +26,8 @@ export default function BoardColumn({ currentUser, status, tickets, users, onTic
         <CardTitle className="board-column-title text-sm">
           <StatusIcon weight="bold" />
           {status.label}
+          <span className="board-column-count">{tickets.length}{wipLimit ? ` / ${wipLimit}` : ''}</span>
         </CardTitle>
-        <Badge variant={isOverLimit ? 'destructive' : 'secondary'}>{tickets.length}{wipLimit ? ` / ${wipLimit}` : ''}</Badge>
       </CardHeader>
       <CardContent className="board-column-body">
         <SortableContext items={tickets.map((t) => t.id)} strategy={verticalListSortingStrategy}>
@@ -40,6 +39,7 @@ export default function BoardColumn({ currentUser, status, tickets, users, onTic
               users={users}
               onAssign={(assigneeId) => onTicketAssign(ticket.id, assigneeId)}
               onView={() => onTicketView(ticket.id)}
+              onLabelClick={() => onTicketView(ticket.id)}
             />
           ))}
           {tickets.length === 0 && (

@@ -21,7 +21,7 @@ import {
 } from '@phosphor-icons/react';
 
 const NAV_LINKS = [
-  { href: '/', label: 'Board', icon: KanbanIcon },
+  { href: '/', label: 'Overview', icon: KanbanIcon },
   { href: '/tickets', label: 'Tickets', icon: TicketIcon },
   { href: '/sprints', label: 'Sprints', icon: RowsIcon },
   { href: '/my-tasks', label: 'My Tasks', icon: ListChecksIcon },

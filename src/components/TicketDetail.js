@@ -92,13 +92,17 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
   const [activeTab, setActiveTab] = useState('comments');
   const [pendingStatus, setPendingStatus] = useState(null);
 
-  async function fetchTicket() {
+  async function fetchTicket({ preserveDraft = isEditing } = {}) {
     const res = await apiFetch(`/api/tickets/${activeTicketId}`);
     const data = await res.json();
     if (data.ticket) {
       setTicket(data.ticket);
-      setTitle(data.ticket.title);
-      setDescription(data.ticket.description);
+      if (!preserveDraft || !ticket || ticket.id !== data.ticket.id) {
+        setTitle(data.ticket.title);
+        setDescription(data.ticket.description);
+        setOriginalTitle(data.ticket.title);
+        setOriginalDescription(data.ticket.description);
+      }
       setEvents(data.ticket.events || []);
       setTotalPointsInput(data.ticket.total_points != null ? String(data.ticket.total_points) : '');
       setPointsRemainingInput(data.ticket.points_remaining != null ? String(data.ticket.points_remaining) : '');
@@ -251,8 +255,18 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(patch),
       });
+      const data = await res.json();
       if (res.ok) {
-        fetchTicket();
+        if (data.ticket) {
+          setTicket(data.ticket);
+          setTitle(data.ticket.title);
+          setDescription(data.ticket.description);
+          setOriginalTitle(data.ticket.title);
+          setOriginalDescription(data.ticket.description);
+          setEvents(data.ticket.events || []);
+        } else {
+          await fetchTicket({ preserveDraft: false });
+        }
         fetchComments();
       }
     }

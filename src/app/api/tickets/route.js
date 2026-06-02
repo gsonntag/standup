@@ -8,6 +8,12 @@ import { attachMarkdownImagesToTicket } from '@/lib/markdown-attachments';
 
 const PRIORITY_VALUES = new Set(PRIORITIES.map((p) => p.value));
 const STATUS_VALUES = new Set(STATUSES.map((s) => s.value));
+const SORT_EXPRESSIONS = {
+  number: 't.number',
+  priority: "CASE t.priority WHEN 'urgent' THEN 4 WHEN 'high' THEN 3 WHEN 'medium' THEN 2 WHEN 'low' THEN 1 ELSE 0 END",
+  assignee: 'LOWER(COALESCE(assignee_sort.username, assignee.username, \'\'))',
+  sprint: 'LOWER(COALESCE(s.name, \'\'))',
+};
 
 function parsePositiveInteger(value, field) {
   if (value === null || value === undefined || value === '') return null;
@@ -223,11 +229,17 @@ export const GET = withAuth(async (request) => {
 
   const limit = Math.min(parseInt(searchParams.get('limit') || '100', 10), 500);
   const offset = parseInt(searchParams.get('offset') || '0', 10);
+  const sortBy = SORT_EXPRESSIONS[searchParams.get('sort_by')] ? searchParams.get('sort_by') : 'sort_order';
+  const sortDir = searchParams.get('sort_dir') === 'desc' ? 'DESC' : 'ASC';
+  const orderBy = sortBy === 'sort_order'
+    ? 't.sort_order ASC, t.created_at DESC'
+    : `${SORT_EXPRESSIONS[sortBy]} ${sortDir}, t.sort_order ASC, t.created_at DESC`;
 
   const tickets = db.prepare(`
     SELECT t.*,
       assignee.username AS assignee_username,
       creator.username AS creator_username,
+      s.name AS sprint_name,
       gr.id AS github_repository_id,
       gr.owner AS github_repository_owner,
       gr.name AS github_repository_name,
@@ -242,10 +254,19 @@ export const GET = withAuth(async (request) => {
       ) AS unresolved_blocker_count
     FROM tickets t
     LEFT JOIN users assignee ON assignee.id = t.assignee_id
+    LEFT JOIN users assignee_sort ON assignee_sort.id = COALESCE(t.assignee_id, (
+      SELECT ta.user_id
+      FROM ticket_assignees ta
+      JOIN users au ON au.id = ta.user_id
+      WHERE ta.ticket_id = t.id
+      ORDER BY LOWER(au.username) ASC
+      LIMIT 1
+    ))
     JOIN users creator ON creator.id = t.creator_id
+    LEFT JOIN sprints s ON s.id = t.sprint_id
     LEFT JOIN github_repositories gr ON gr.id = t.github_repo_id
     ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-    ORDER BY t.sort_order ASC, t.created_at DESC
+    ORDER BY ${orderBy}
     LIMIT ? OFFSET ?
   `).all(...args, limit, offset);
 
