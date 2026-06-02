@@ -1,13 +1,22 @@
 import { NextResponse } from 'next/server';
-import { withAdmin } from '@/lib/api';
 import { getDb } from '@/lib/db';
 
-export const GET = withAdmin(async (request) => {
+export async function GET(request) {
   const db = getDb();
   const { searchParams } = new URL(request.url);
+  const sprints = db.prepare(`
+    SELECT s.*,
+      (SELECT COUNT(*) FROM tickets WHERE sprint_id = s.id) AS ticket_count,
+      (SELECT COUNT(*) FROM tickets WHERE sprint_id = s.id AND status = 'done') AS done_count,
+      (SELECT COALESCE(SUM(total_points), 0) FROM tickets WHERE sprint_id = s.id) AS total_points,
+      (SELECT COALESCE(SUM(CASE WHEN status = 'done' THEN 0 ELSE points_remaining END), 0) FROM tickets WHERE sprint_id = s.id) AS points_remaining
+    FROM sprints s
+    ORDER BY start_date DESC
+  `).all();
 
   const sprintId = searchParams.get('sprint_id')
     || db.prepare("SELECT id FROM sprints WHERE status = 'active' LIMIT 1").get()?.id
+    || sprints[0]?.id
     || null;
 
   const sprint = sprintId
@@ -15,7 +24,7 @@ export const GET = withAdmin(async (request) => {
     : null;
 
   if (!sprint) {
-    return NextResponse.json({ sprint: null, members: [] });
+    return NextResponse.json({ sprint: null, sprints, members: [], in_progress_tickets: [] });
   }
 
   const members = db.prepare(`
@@ -35,5 +44,23 @@ export const GET = withAdmin(async (request) => {
     ORDER BY points_done DESC, done DESC, u.username ASC
   `).all(sprint.id);
 
-  return NextResponse.json({ sprint, members });
-});
+  const inProgressTickets = db.prepare(`
+    SELECT t.id, t.number, t.title, t.status, t.priority,
+      GROUP_CONCAT(DISTINCT u.username) AS assignee_names
+    FROM tickets t
+    LEFT JOIN ticket_assignees ta ON ta.ticket_id = t.id
+    LEFT JOIN users u ON u.id = ta.user_id
+    WHERE t.sprint_id = ?
+      AND t.status IN ('in_progress', 'in_review')
+    GROUP BY t.id
+    ORDER BY
+      CASE t.status WHEN 'in_progress' THEN 0 WHEN 'in_review' THEN 1 ELSE 2 END,
+      t.sort_order ASC,
+      t.created_at DESC
+  `).all(sprint.id).map((ticket) => ({
+    ...ticket,
+    assignee_names: ticket.assignee_names ? ticket.assignee_names.split(',') : [],
+  }));
+
+  return NextResponse.json({ sprint, sprints, members, in_progress_tickets: inProgressTickets });
+}

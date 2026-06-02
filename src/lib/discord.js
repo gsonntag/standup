@@ -25,6 +25,9 @@ export function ticketStakeholderDiscordIds(ticketId, { excludeUserId = null, me
   for (const a of db.prepare('SELECT user_id FROM ticket_assignees WHERE ticket_id = ?').all(ticketId)) {
     ids.add(a.user_id);
   }
+  for (const r of db.prepare('SELECT user_id FROM ticket_reviewers WHERE ticket_id = ?').all(ticketId)) {
+    ids.add(r.user_id);
+  }
   for (const w of db.prepare('SELECT user_id FROM ticket_watchers WHERE ticket_id = ?').all(ticketId)) {
     ids.add(w.user_id);
   }
@@ -121,6 +124,19 @@ export function notifyTicketUnassigned(ticket, { actorName, oldAssigneeDiscordId
       url: ticketUrl(ticket.id),
       description: `${destination} by ${actorName || 'someone'}`,
       color: 0x6e7781,
+    }],
+  });
+}
+
+export function notifyReviewRequested(ticket, { actorName, reviewerDiscordIds = [] } = {}) {
+  if (!reviewerDiscordIds.length) return false;
+  return notifyDiscord({
+    content: mentionPrefix(reviewerDiscordIds),
+    embeds: [{
+      title: `Review requested on #${ticket.number}`,
+      url: ticketUrl(ticket.id),
+      description: `${actorName || 'Someone'} requested your review on #${ticket.number} ${ticket.title}`,
+      color: 0x5e6ad2,
     }],
   });
 }

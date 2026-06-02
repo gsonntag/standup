@@ -5,6 +5,7 @@ import { apiFetch } from '@/lib/client-api';
 import { PRIORITIES, STATUSES } from '@/lib/constants';
 import { parseTimestamp, timeAgo } from '@/lib/dates';
 import { uploadPastedImage } from '@/lib/description-paste';
+import { uploadImageFiles } from '@/lib/upload-image';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -88,6 +89,8 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
   const [commitLoading, setCommitLoading] = useState(false);
   const [commitSyncing, setCommitSyncing] = useState(false);
   const [commitError, setCommitError] = useState('');
+  const [activeTab, setActiveTab] = useState('comments');
+  const [pendingStatus, setPendingStatus] = useState(null);
 
   async function fetchTicket() {
     const res = await apiFetch(`/api/tickets/${activeTicketId}`);
@@ -186,11 +189,53 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
     }
   }
 
+  async function updateReviewers(nextReviewerIds) {
+    const res = await apiFetch(`/api/tickets/${activeTicketId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reviewer_ids: nextReviewerIds }),
+    });
+    if (res.ok) {
+      fetchTicket();
+      fetchComments();
+    }
+  }
+
   function toggleAssignee(userId) {
     const current = new Set((ticket.assignees || []).map((assignee) => assignee.id));
     if (current.has(userId)) current.delete(userId);
     else current.add(userId);
     updateAssignees([...current]);
+  }
+
+  function toggleReviewer(userId) {
+    const current = new Set((ticket.reviewers || []).map((reviewer) => reviewer.id));
+    if (current.has(userId)) current.delete(userId);
+    else current.add(userId);
+    updateReviewers([...current]);
+  }
+
+  function handleStatusChange(value) {
+    if (ticket.status === 'in_progress' && ['in_review', 'done'].includes(value) && !relatedCommits.length) {
+      setPendingStatus(value);
+      return;
+    }
+    updateField('status', value);
+  }
+
+  async function moveWithoutCommit() {
+    const value = pendingStatus;
+    setPendingStatus(null);
+    if (value) await updateField('status', value);
+  }
+
+  async function moveAndOpenCommits() {
+    const value = pendingStatus;
+    setPendingStatus(null);
+    if (value) await updateField('status', value);
+    setActiveTab('commits');
+    setCommitPickerOpen(true);
+    fetchCommitOptions();
   }
 
   async function finishEditing() {
@@ -221,24 +266,30 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
     setIsEditing(false);
   }
 
-  async function appendDescriptionImage(markdown) {
-    const nextDescription = `${description.trimEnd()}\n\n${markdown}\n`;
-    setDescription(nextDescription);
-    await updateField('description', nextDescription);
-  }
-
-  async function insertDescriptionImage(markdown, target) {
+  function descriptionWithMarkdown(markdown, target = null) {
     const start = target?.selectionStart ?? description.length;
     const end = target?.selectionEnd ?? description.length;
     const prefix = description.slice(0, start).replace(/\s*$/, '\n\n');
     const suffix = description.slice(end).replace(/^\s*/, '\n');
-    const nextDescription = `${prefix}${markdown}${suffix}`;
+    return `${prefix}${markdown.trim()}${suffix}`;
+  }
+
+  async function appendDescriptionImage(markdown) {
+    const nextDescription = `${description.trimEnd()}\n\n${markdown.trim()}\n`;
     setDescription(nextDescription);
     await updateField('description', nextDescription);
+    await fetchTicket();
+  }
+
+  async function insertDescriptionImage(markdown, target) {
+    const nextDescription = descriptionWithMarkdown(markdown, target);
+    setDescription(nextDescription);
+    await updateField('description', nextDescription);
+    await fetchTicket();
   }
 
   function handleDescriptionPaste(e) {
-    uploadPastedImage(e, (markdown) => insertDescriptionImage(markdown, e.currentTarget));
+    uploadPastedImage(e, (markdown) => insertDescriptionImage(markdown, e.currentTarget), { ticketId: activeTicketId });
   }
 
   async function removeDependency(dependsOnId) {
@@ -277,20 +328,12 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
   }
 
   async function handleAttachFile(e) {
-    const file = e.target.files?.[0];
+    const files = Array.from(e.target.files || []);
     e.target.value = '';
-    if (!file) return;
+    if (!files.length) return;
     setAttachUploading(true);
     try {
-      const fd = new FormData();
-      fd.append('image', file);
-      fd.append('ticket_id', activeTicketId);
-      const res = await apiFetch('/api/uploads', { method: 'POST', body: fd });
-      if (!res.ok) {
-        const data = await res.json();
-        alert(data.error || 'Upload failed.');
-        return;
-      }
+      await uploadImageFiles(files, { ticketId: activeTicketId });
       fetchTicket();
     } catch (err) {
       alert(err.message);
@@ -488,7 +531,7 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
                   <h3>Description</h3>
                   <p>Markdown, screenshots, and acceptance criteria live here.</p>
                 </div>
-                {isEditing && <ImageUploadButton onUploaded={appendDescriptionImage} />}
+                {isEditing && <ImageUploadButton ticketId={activeTicketId} onUploaded={appendDescriptionImage} />}
               </div>
               {isEditing ? (
                 <div className="ticket-description-editor">
@@ -505,7 +548,7 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
               )}
             </section>
 
-            <Tabs defaultValue="comments" className="ticket-detail-tabs">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="ticket-detail-tabs">
               <TabsList className="ticket-detail-tabs-list">
                 <TabsTrigger value="comments"><ChatCircleTextIcon weight="bold" />Comments</TabsTrigger>
                 <TabsTrigger value="activity"><ActivityIcon weight="bold" />Activity</TabsTrigger>
@@ -663,6 +706,7 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
                     className="hidden"
                     type="file"
                     accept="image/png,image/jpeg,image/gif,image/webp"
+                    multiple
                     onChange={handleAttachFile}
                   />
                   {!ticket.attachments?.length && <div className="ticket-detail-empty">No attachments yet.</div>}
@@ -709,6 +753,35 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
                 </div>
               </div>
               <div className="ticket-property-field">
+                <Label>Reviewers</Label>
+                <div className="ticket-assignee-check-list">
+                  {users.map((user) => (
+                    <button
+                      key={user.id}
+                      type="button"
+                      className="ticket-assignee-check-row"
+                      onClick={() => toggleReviewer(user.id)}
+                    >
+                      <Checkbox checked={ticket.reviewers?.some((reviewer) => reviewer.id === user.id)} aria-hidden="true" tabIndex={-1} />
+                      <span>@{user.username}</span>
+                    </button>
+                  ))}
+                </div>
+                {!!ticket.reviewers?.length && (
+                  <div className="ticket-pill-list">
+                    {ticket.reviewers.map((reviewer) => (
+                      <span
+                        key={reviewer.id}
+                        className="ticket-person-pill"
+                        title={reviewer.requested_by_username ? `Requested by ${reviewer.requested_by_username}` : undefined}
+                      >
+                        @{reviewer.username}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="ticket-property-field">
                 <Label>Watchers</Label>
                 <div className="ticket-pill-list">
                   {ticket.watchers?.map((w) => (
@@ -739,7 +812,7 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
               </div>
               <div className="ticket-property-field">
                 <Label>Status</Label>
-                <Select value={ticket.status} onValueChange={(value) => updateField('status', value)}>
+                <Select value={ticket.status} onValueChange={handleStatusChange}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {STATUSES.map((status) => {
@@ -915,6 +988,30 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
           </aside>
         </div>
       </DialogContent>
+      {pendingStatus && (
+        <Dialog open onOpenChange={(open) => { if (!open) setPendingStatus(null); }}>
+          <DialogContent className="commit-nudge-dialog">
+            <DialogHeader>
+              <DialogTitle>Link the commit?</DialogTitle>
+            </DialogHeader>
+            <div className="commit-nudge-copy">
+              <p>
+                Moving this from In Progress to {STATUSES.find((status) => status.value === pendingStatus)?.label || pendingStatus}
+                usually means there is a commit or PR worth linking.
+              </p>
+              <p className="text-muted">You can skip this for design, planning, ops, or other non-code tickets.</p>
+            </div>
+            <div className="commit-nudge-actions">
+              <Button type="button" className="tickets-new-button" onClick={moveAndOpenCommits}>
+                <GitCommitIcon weight="bold" />
+                Move and link commit
+              </Button>
+              <Button type="button" variant="outline" onClick={moveWithoutCommit}>Move without commit</Button>
+              <Button type="button" variant="ghost" onClick={() => setPendingStatus(null)}>Cancel</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </Dialog>
   );
 }

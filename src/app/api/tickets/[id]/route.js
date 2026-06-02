@@ -7,12 +7,14 @@ import { getTicketById } from '../route';
 import { publish } from '@/lib/events';
 import {
   notifyBlockerResolved,
+  notifyReviewRequested,
   notifyStatusChanged,
   notifyTicketAssigned,
   notifyTicketUnassigned,
   ticketStakeholderDiscordIds,
 } from '@/lib/discord';
 import { classifyDue, markDueReminderSent } from '@/lib/reminders';
+import { attachMarkdownImagesToTicket } from '@/lib/markdown-attachments';
 
 const STATUS_VALUES = new Set(STATUSES.map((s) => s.value));
 const PRIORITY_VALUES = new Set(PRIORITIES.map((p) => p.value));
@@ -123,6 +125,16 @@ export const PATCH = withAuth(async (request, user, context) => {
     : existingAssigneeIds;
   if (assignmentRequested) {
     body.assignee_id = nextAssigneeIds[0] || null;
+  }
+  const reviewersRequested = 'reviewer_ids' in body;
+  const existingReviewerIds = db.prepare('SELECT user_id FROM ticket_reviewers WHERE ticket_id = ?').all(id).map((row) => row.user_id);
+  const nextReviewerIds = reviewersRequested ? normalizeIdList(body.reviewer_ids) : existingReviewerIds;
+  if (reviewersRequested) {
+    for (const reviewerId of nextReviewerIds) {
+      if (!db.prepare('SELECT id FROM users WHERE id = ?').get(reviewerId)) {
+        return jsonError('Reviewer not found.', 404);
+      }
+    }
   }
   const allowed = ['title', 'description', 'status', 'priority', 'sprint_id', 'assignee_id', 'sort_order', 'due_date', 'total_points', 'points_remaining', 'github_repo_id'];
   const sets = [];
@@ -258,13 +270,18 @@ export const PATCH = withAuth(async (request, user, context) => {
     return jsonError('points_remaining cannot exceed total_points.');
   }
 
-  if (!sets.length && !('position' in body)) return NextResponse.json({ ticket: getTicketById(db, id) });
+  const relationshipRequested = assignmentRequested || reviewersRequested;
+  if (!sets.length && !relationshipRequested && !('position' in body)) {
+    return NextResponse.json({ ticket: getTicketById(db, id) });
+  }
 
-  if (sets.length) {
+  if (sets.length || relationshipRequested) {
     sets.push("updated_at = datetime('now')");
     args.push(id);
     const tx = db.transaction(() => {
-      db.prepare(`UPDATE tickets SET ${sets.join(', ')} WHERE id = ?`).run(...args);
+      if (sets.length > 1) {
+        db.prepare(`UPDATE tickets SET ${sets.join(', ')} WHERE id = ?`).run(...args);
+      }
       for (const detail of changedFieldDetails) {
         db.prepare(
           `INSERT INTO ticket_events (id, ticket_id, actor_id, kind, field, old_value, new_value, created_at)
@@ -292,6 +309,23 @@ export const PATCH = withAuth(async (request, user, context) => {
           db.prepare('DELETE FROM ticket_watchers WHERE ticket_id = ? AND user_id = ?')
             .run(id, removedAssigneeId);
         }
+      }
+      if (reviewersRequested) {
+        db.prepare('DELETE FROM ticket_reviewers WHERE ticket_id = ?').run(id);
+        for (const reviewerId of nextReviewerIds) {
+          db.prepare('INSERT INTO ticket_reviewers (ticket_id, user_id, requested_by) VALUES (?, ?, ?)')
+            .run(id, reviewerId, user.id);
+          db.prepare('INSERT OR IGNORE INTO ticket_watchers (ticket_id, user_id) VALUES (?, ?)')
+            .run(id, reviewerId);
+        }
+        const removedReviewerIds = existingReviewerIds.filter((oldId) => !nextReviewerIds.includes(oldId));
+        for (const removedReviewerId of removedReviewerIds) {
+          db.prepare('DELETE FROM ticket_watchers WHERE ticket_id = ? AND user_id = ?')
+            .run(id, removedReviewerId);
+        }
+      }
+      if ('description' in body) {
+        attachMarkdownImagesToTicket(db, { ticketId: id, description: body.description || '', userId: user.id });
       }
       if ('github_repo_id' in body && (body.github_repo_id || null) !== (existing.github_repo_id || null)) {
         db.prepare('DELETE FROM ticket_commits WHERE ticket_id = ?').run(id);
@@ -372,6 +406,20 @@ export const PATCH = withAuth(async (request, user, context) => {
           newAssigneeName: newName,
         });
       }
+    }
+  }
+
+  if (reviewersRequested) {
+    const addedReviewerIds = nextReviewerIds.filter((reviewerId) => !existingReviewerIds.includes(reviewerId) && reviewerId !== user.id);
+    if (addedReviewerIds.length) {
+      const placeholders = addedReviewerIds.map(() => '?').join(',');
+      const reviewerDiscordIds = db.prepare(`SELECT discord_id FROM users WHERE id IN (${placeholders}) AND discord_id IS NOT NULL`)
+        .all(...addedReviewerIds)
+        .map((row) => row.discord_id);
+      notifyReviewRequested(getTicketById(db, id), {
+        actorName: user.username,
+        reviewerDiscordIds,
+      });
     }
   }
 

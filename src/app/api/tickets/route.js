@@ -4,6 +4,7 @@ import { jsonError, withAuth } from '@/lib/api';
 import { getDb } from '@/lib/db';
 import { PRIORITIES, STATUSES } from '@/lib/constants';
 import { notifyTicketCreated } from '@/lib/discord';
+import { attachMarkdownImagesToTicket } from '@/lib/markdown-attachments';
 
 const PRIORITY_VALUES = new Set(PRIORITIES.map((p) => p.value));
 const STATUS_VALUES = new Set(STATUSES.map((s) => s.value));
@@ -90,6 +91,36 @@ export function attachAssignees(db, tickets) {
   });
 }
 
+export function attachReviewers(db, tickets) {
+  if (!tickets.length) return tickets;
+  const ticketIds = tickets.map((ticket) => ticket.id);
+  const placeholders = ticketIds.map(() => '?').join(',');
+  const reviewerRows = db.prepare(`
+    SELECT tr.ticket_id, u.id, u.username, u.discord_id, tr.requested_by, requester.username AS requested_by_username, tr.created_at
+    FROM ticket_reviewers tr
+    JOIN users u ON u.id = tr.user_id
+    LEFT JOIN users requester ON requester.id = tr.requested_by
+    WHERE tr.ticket_id IN (${placeholders})
+    ORDER BY tr.created_at ASC, u.username ASC
+  `).all(...ticketIds);
+  const reviewersByTicket = new Map();
+  for (const row of reviewerRows) {
+    if (!reviewersByTicket.has(row.ticket_id)) reviewersByTicket.set(row.ticket_id, []);
+    reviewersByTicket.get(row.ticket_id).push({
+      id: row.id,
+      username: row.username,
+      discord_id: row.discord_id,
+      requested_by: row.requested_by,
+      requested_by_username: row.requested_by_username,
+      created_at: row.created_at,
+    });
+  }
+  return tickets.map((ticket) => ({
+    ...ticket,
+    reviewers: reviewersByTicket.get(ticket.id) || [],
+  }));
+}
+
 function attachGitHubRepositories(tickets) {
   return tickets.map((ticket) => {
     const githubRepository = ticket.github_repository_id
@@ -137,7 +168,7 @@ export function getTicketById(db, id) {
     WHERE t.id = ?
   `).get(id);
   if (!ticket) return null;
-  return attachGitHubRepositories(attachLabels(db, attachAssignees(db, [ticket])))[0];
+  return attachGitHubRepositories(attachLabels(db, attachReviewers(db, attachAssignees(db, [ticket]))))[0];
 }
 
 export const GET = withAuth(async (request) => {
@@ -218,7 +249,7 @@ export const GET = withAuth(async (request) => {
     LIMIT ? OFFSET ?
   `).all(...args, limit, offset);
 
-  return NextResponse.json({ tickets: attachGitHubRepositories(attachLabels(db, attachAssignees(db, tickets))), total });
+  return NextResponse.json({ tickets: attachGitHubRepositories(attachLabels(db, attachReviewers(db, attachAssignees(db, tickets)))), total });
 });
 
 export const POST = withAuth(async (request, user) => {
@@ -309,6 +340,7 @@ export const POST = withAuth(async (request, user) => {
     for (const blockerId of blockerIds) {
       db.prepare('INSERT OR IGNORE INTO ticket_dependencies (ticket_id, depends_on_id) VALUES (?, ?)').run(id, blockerId);
     }
+    attachMarkdownImagesToTicket(db, { ticketId: id, description: body.description || '', userId: user.id });
   });
   createTx();
 

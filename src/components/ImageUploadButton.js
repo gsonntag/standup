@@ -1,21 +1,21 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { uploadImageFile } from '@/lib/upload-image';
+import { uploadImageFiles } from '@/lib/upload-image';
 import { Button } from '@/components/ui/button';
 
-export default function ImageUploadButton({ onUploaded }) {
+export default function ImageUploadButton({ onUploaded, ticketId = null }) {
   const inputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
 
   async function handleChange(e) {
-    const file = e.target.files?.[0];
+    const files = Array.from(e.target.files || []);
     e.target.value = '';
-    if (!file) return;
+    if (!files.length) return;
 
     setUploading(true);
     try {
-      onUploaded(await uploadImageFile(file));
+      onUploaded(await uploadImageFiles(files, { ticketId }));
     } catch (error) {
       alert(error.message);
     } finally {
@@ -30,6 +30,7 @@ export default function ImageUploadButton({ onUploaded }) {
         className="hidden"
         type="file"
         accept="image/png,image/jpeg,image/gif,image/webp"
+        multiple
         onChange={handleChange}
       />
       <Button
@@ -39,7 +40,7 @@ export default function ImageUploadButton({ onUploaded }) {
         disabled={uploading}
         onClick={() => inputRef.current?.click()}
       >
-        {uploading ? 'Uploading...' : 'Upload image'}
+        {uploading ? 'Uploading...' : 'Upload images'}
       </Button>
     </>
   );

@@ -21,23 +21,30 @@ export default function DashboardView() {
   const [sprintId, setSprintId] = useState('');
   const [sprint, setSprint] = useState(null);
   const [members, setMembers] = useState([]);
+  const [inProgressTickets, setInProgressTickets] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    apiFetch('/api/sprints').then((r) => r.json()).then((d) => {
+    apiFetch('/api/dashboard').then((r) => r.json()).then((d) => {
       const list = d.sprints || [];
       setSprints(list);
-      const active = list.find((s) => s.status === 'active');
-      setSprintId(active?.id || list[0]?.id || '');
+      setSprint(d.sprint || null);
+      setMembers(d.members || []);
+      setInProgressTickets(d.in_progress_tickets || []);
+      setSprintId(d.sprint?.id || '');
+      setLoading(false);
     });
   }, []);
 
   useEffect(() => {
+    if (!sprintId) return;
     setLoading(true);
     const query = sprintId ? `?sprint_id=${sprintId}` : '';
     apiFetch(`/api/dashboard${query}`).then((r) => r.json()).then((d) => {
       setSprint(d.sprint || null);
+      setSprints(d.sprints || []);
       setMembers(d.members || []);
+      setInProgressTickets(d.in_progress_tickets || []);
       setLoading(false);
     });
   }, [sprintId]);
@@ -153,6 +160,29 @@ export default function DashboardView() {
                 </TableFooter>
               )}
               </Table>
+            </CardContent>
+          </Card>
+          <Card className="dashboard-table-card ds-card">
+            <CardHeader>
+              <span className="ds-section-icon"><LightningIcon weight="bold" /></span>
+              <CardTitle>Currently moving</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="dashboard-ticket-list">
+                {inProgressTickets.map((ticket) => (
+                  <div key={ticket.id} className="dashboard-ticket-row">
+                    <span className="text-mono">#{ticket.number}</span>
+                    <strong>{ticket.title}</strong>
+                    <Badge className={`status-badge status-badge-${ticket.status}`} variant="outline">{ticket.status.replaceAll('_', ' ')}</Badge>
+                    <span className="text-muted">
+                      {ticket.assignee_names?.length ? ticket.assignee_names.map((name) => `@${name}`).join(', ') : 'Unassigned'}
+                    </span>
+                  </div>
+                ))}
+                {!inProgressTickets.length && !loading && (
+                  <div className="dashboard-empty-inline">No tickets currently in progress or PR.</div>
+                )}
+              </div>
             </CardContent>
           </Card>
         </>

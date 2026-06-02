@@ -1,18 +1,20 @@
-import { uploadImageFile } from './upload-image';
+import { uploadImageFiles } from './upload-image';
 
-export function getPastedImage(event) {
+export function getPastedImages(event) {
   const items = Array.from(event.clipboardData?.items || []);
-  const item = items.find((entry) => entry.kind === 'file' && entry.type.startsWith('image/'));
-  return item?.getAsFile() || null;
+  return items
+    .filter((entry) => entry.kind === 'file' && entry.type.startsWith('image/'))
+    .map((entry) => entry.getAsFile())
+    .filter(Boolean);
 }
 
-export async function uploadPastedImage(event, onUploaded) {
-  const file = getPastedImage(event);
-  if (!file) return false;
+export async function uploadPastedImage(event, onUploaded, options) {
+  const files = getPastedImages(event);
+  if (!files.length) return false;
 
   event.preventDefault();
   try {
-    onUploaded(await uploadImageFile(file));
+    onUploaded(await uploadImageFiles(files, options));
   } catch (error) {
     alert(error.message);
   }

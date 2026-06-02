@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
+  ChartBarIcon,
   DiscordLogoIcon,
   GithubLogoIcon,
   KeyIcon,
@@ -223,11 +224,21 @@ export default function TeamView({ currentUser }) {
         eyebrow="Workspace"
         title="Team"
         subtitle="Manage LA Hacks tech accounts, Discord pings, and GitHub repositories."
-        actions={isAdmin && (
-          <Button size="sm" className="tickets-new-button" onClick={() => setShowForm(true)}>
-            <UserCirclePlusIcon weight="bold" />
-            Add user
-          </Button>
+        actions={(
+          <div className="team-header-actions">
+            <Button asChild size="sm" variant="outline">
+              <a href="/dashboard">
+                <ChartBarIcon weight="bold" />
+                Public dashboard
+              </a>
+            </Button>
+            {isAdmin && (
+              <Button size="sm" className="tickets-new-button" onClick={() => setShowForm(true)}>
+                <UserCirclePlusIcon weight="bold" />
+                Add user
+              </Button>
+            )}
+          </div>
         )}
       />
       {showForm && (

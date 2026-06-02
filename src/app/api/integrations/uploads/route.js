@@ -32,28 +32,40 @@ export async function POST(request) {
   }
 
   const formData = await request.formData();
-  const file = formData.get('image');
+  const files = formData.getAll('image').filter((file) => file && typeof file.arrayBuffer === 'function');
 
-  if (!file || typeof file.arrayBuffer !== 'function') {
-    return jsonError('Image is required.');
+  if (!files.length) {
+    return jsonError('At least one image is required.');
   }
-  if (!IMAGE_TYPES.has(file.type)) {
-    return jsonError('Upload a PNG, JPG, GIF, or WebP image.');
-  }
-  if (file.size > MAX_IMAGE_BYTES) {
-    return jsonError('Image must be 5 MB or smaller.');
+  for (const file of files) {
+    if (!IMAGE_TYPES.has(file.type)) {
+      return jsonError('Upload PNG, JPG, GIF, or WebP images.');
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      return jsonError(`${file.name || 'Image'} must be 5 MB or smaller.`);
+    }
   }
 
-  const ext = IMAGE_TYPES.get(file.type);
-  const fileName = `${randomUUID()}.${ext}`;
   const uploadDir = path.join(process.cwd(), 'public', 'uploads');
   await mkdir(uploadDir, { recursive: true });
-  await writeFile(path.join(uploadDir, fileName), Buffer.from(await file.arrayBuffer()));
-
-  const url = `/uploads/${fileName}`;
+  const uploaded = [];
+  for (const file of files) {
+    const ext = IMAGE_TYPES.get(file.type);
+    const fileName = `${randomUUID()}.${ext}`;
+    await writeFile(path.join(uploadDir, fileName), Buffer.from(await file.arrayBuffer()));
+    const url = `/uploads/${fileName}`;
+    uploaded.push({
+      url,
+      markdown: `![${file.name || 'image'}](${url})`,
+      filename: file.name || fileName,
+      mime_type: file.type,
+      size_bytes: file.size,
+    });
+  }
 
   return NextResponse.json({
-    url,
-    markdown: `![${file.name || 'image'}](${url})`,
+    url: uploaded[0].url,
+    markdown: uploaded.map((file) => file.markdown).join('\n\n'),
+    images: uploaded,
   }, { status: 201 });
 }

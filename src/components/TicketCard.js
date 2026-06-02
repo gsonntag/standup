@@ -87,14 +87,15 @@ export default function TicketCard({ ticket, users, onAssign, onView }) {
             <DropdownMenuTrigger asChild>
               <Button
                 type="button"
-                size="sm"
+                size="icon-sm"
                 variant="outline"
                 className="ticket-card-assignee-trigger"
+                title="Edit assignees"
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={(e) => e.stopPropagation()}
               >
                 <UserPlusIcon weight="bold" />
-                {assignees.length || 'Assign'}
+                <span className="sr-only">Edit assignees</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="ticket-card-assignee-menu" onPointerDown={(e) => e.stopPropagation()}>
@@ -114,45 +115,49 @@ export default function TicketCard({ ticket, users, onAssign, onView }) {
         </div>
       </CardHeader>
       <CardContent>
-      <div className="ticket-card-title">{ticket.title}</div>
-      <div className="ticket-card-meta">
-        <Badge className={`priority-badge priority-badge-${ticket.priority}`} variant="outline">
-          <PriorityIcon weight="bold" />
-          {priorityMeta?.label || ticket.priority}
-        </Badge>
-        <span className="label-list">
-          {ticket.labels?.map((label) => (
-            <span key={label.id} className="label" style={{ backgroundColor: label.color }}>
-              {label.name}
-            </span>
-          ))}
-        </span>
-        {ticket.status !== 'done' && ticket.due_date && (() => {
-          const days = daysUntil(ticket.due_date);
-          if (isOverdue(ticket.due_date)) {
-            return <span className="due-date overdue">overdue</span>;
-          }
-          if (days <= 3) {
-            return <span className="due-date due-soon">due {days === 0 ? 'today' : `in ${days}d`}</span>;
-          }
-          return null;
-        })()}
-        {hasUnresolvedBlockers && <Badge variant="destructive">Blocked</Badge>}
-        {ticket.total_points != null && (
-          <Badge variant="secondary" title="Points remaining">
-            {ticket.points_remaining ?? ticket.total_points} pt. left
+        <div className="ticket-card-title">{ticket.title}</div>
+        <div className="ticket-card-label-row">
+          <Badge className={`priority-badge priority-badge-${ticket.priority}`} variant="outline">
+            <PriorityIcon weight="bold" />
+            {priorityMeta?.label || ticket.priority}
           </Badge>
-        )}
-        <span className="ticket-card-assignee-stack" aria-label={assignees.length ? 'Assignees' : 'Unassigned'}>
-          {assignees.slice(0, 3).map((assignee) => (
-            <span key={assignee.id} className="ticket-card-assignee" title={assignee.username}>
-              {assignee.username?.slice(0, 2)}
-            </span>
-          ))}
-          {assignees.length > 3 && <span className="ticket-card-assignee-more">+{assignees.length - 3}</span>}
-          {!assignees.length && <span className="ticket-card-unassigned">Unassigned</span>}
-        </span>
-      </div>
+          <span className="label-list">
+            {ticket.labels?.map((label) => (
+              <span key={label.id} className="label" style={{ backgroundColor: label.color }}>
+                {label.name}
+              </span>
+            ))}
+          </span>
+          {hasUnresolvedBlockers && <Badge variant="destructive">Blocked</Badge>}
+        </div>
+        <div className="ticket-card-footer">
+          <div className="ticket-card-footer-meta">
+            {ticket.total_points != null && (
+              <Badge variant="secondary" title="Points remaining">
+                {ticket.points_remaining ?? ticket.total_points} pt. left
+              </Badge>
+            )}
+            {ticket.status !== 'done' && ticket.due_date && (() => {
+              const days = daysUntil(ticket.due_date);
+              if (isOverdue(ticket.due_date)) {
+                return <span className="due-date overdue">overdue</span>;
+              }
+              if (days <= 3) {
+                return <span className="due-date due-soon">due {days === 0 ? 'today' : `in ${days}d`}</span>;
+              }
+              return <span className="ticket-card-muted-meta">due {ticket.due_date}</span>;
+            })()}
+          </div>
+          <span className="ticket-card-assignee-stack" aria-label={assignees.length ? 'Assignees' : 'Unassigned'}>
+            {assignees.slice(0, 4).map((assignee) => (
+              <span key={assignee.id} className="ticket-card-assignee" title={assignee.username}>
+                {assignee.username?.slice(0, 2)}
+              </span>
+            ))}
+            {assignees.length > 4 && <span className="ticket-card-assignee-more">+{assignees.length - 4}</span>}
+            {!assignees.length && <span className="ticket-card-unassigned">Unassigned</span>}
+          </span>
+        </div>
       </CardContent>
     </Card>
   );

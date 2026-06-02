@@ -196,6 +196,15 @@ db.exec(`
     PRIMARY KEY (ticket_id, user_id)
   );
   CREATE INDEX IF NOT EXISTS idx_ticket_assignees_user ON ticket_assignees(user_id);
+
+  CREATE TABLE IF NOT EXISTS ticket_reviewers (
+    ticket_id     TEXT NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+    user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    requested_by  TEXT REFERENCES users(id) ON DELETE SET NULL,
+    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (ticket_id, user_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_ticket_reviewers_user ON ticket_reviewers(user_id);
 `);
 
 db.prepare(`
