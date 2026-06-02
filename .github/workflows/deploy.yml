@@ -24,4 +24,4 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes \
             "$SSH_USER@$SSH_IP" \
-            "cd /var/www/standup && git pull && npm ci --omit=dev && npm run build && npm run migrate && pm2 restart standup"
+            "cd /var/www/standup && git fetch origin main && git reset --hard origin/main && npm ci && npm run build && npm prune --omit=dev && npm run migrate && pm2 restart standup"
