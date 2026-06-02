@@ -109,6 +109,13 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
     }
   }
 
+  async function navigateToTicketNumber(number) {
+    const res = await apiFetch(`/api/search?q=${number}`);
+    const data = await res.json();
+    const match = (data.results || []).find((t) => t.number === number);
+    if (match) setActiveTicketId(match.id);
+  }
+
   async function fetchComments() {
     const res = await apiFetch(`/api/tickets/${activeTicketId}/comments`);
     const data = await res.json();
@@ -577,6 +584,7 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
                     comments={comments}
                     currentUser={currentUser}
                     users={users}
+                    onTicketRef={navigateToTicketNumber}
                     onAdded={(comment) => setComments((prev) => [...prev, comment])}
                     onDeleted={(commentId) =>
                       setComments((prev) =>

@@ -52,6 +52,16 @@ export async function notifyDiscord({ content, embeds } = {}) {
   if (!WEBHOOK_URL) return false;
   if (!content && !embeds?.length) return false;
 
+  // Append a visible "View ticket" link to any embed that carries a ticket URL.
+  const withLinks = embeds?.map((embed) => {
+    if (!embed.url) return embed;
+    const link = `[View ticket →](${embed.url})`;
+    return {
+      ...embed,
+      description: embed.description ? `${embed.description}\n\n${link}` : link,
+    };
+  });
+
   try {
     const res = await fetch(WEBHOOK_URL, {
       method: 'POST',
@@ -61,7 +71,7 @@ export async function notifyDiscord({ content, embeds } = {}) {
         avatar_url: AVATAR_URL,
         allowed_mentions: { parse: ['users'] },
         content,
-        embeds,
+        embeds: withLinks,
       }),
     });
     if (!res.ok) {

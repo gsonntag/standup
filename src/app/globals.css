@@ -367,6 +367,8 @@ label:not([data-slot="label"]) {
 .comment-author { font-weight: 600; font-size: var(--font-size-sm); }
 .comment-date { font-size: var(--font-size-sm); color: var(--text-muted); }
 .comment-body { font-size: var(--font-size); line-height: 1.5; white-space: pre-wrap; }
+.ticket-ref { background: none; border: 0; padding: 0; font: inherit; color: var(--link); cursor: pointer; }
+.ticket-ref:hover { color: var(--link-hover); text-decoration: underline; }
 .comment-form { margin-top: var(--space-xl); border-top: 1px solid var(--border); padding-top: var(--space-lg); }
 .comment-form textarea:not([data-slot="textarea"]) { margin-bottom: var(--space-md); }
 

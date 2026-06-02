@@ -7,18 +7,26 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { PaperPlaneRightIcon, TrashIcon } from '@phosphor-icons/react';
 
-function renderCommentContent(content, users) {
+function renderCommentContent(content, users, onTicketRef) {
   const usernames = new Set((users || []).map((u) => u.username));
-  const parts = content.split(/(@\w+)/g);
+  const parts = content.split(/(@\w+|#\d+)/g);
   return parts.map((part, i) => {
     if (part.startsWith('@') && usernames.has(part.slice(1))) {
       return <strong key={i}>{part}</strong>;
+    }
+    if (/^#\d+$/.test(part)) {
+      const number = parseInt(part.slice(1), 10);
+      return (
+        <button key={i} type="button" className="ticket-ref" onClick={() => onTicketRef?.(number)}>
+          {part}
+        </button>
+      );
     }
     return part;
   });
 }
 
-export default function CommentThread({ ticketId, comments, onAdded, currentUser, onDeleted, users }) {
+export default function CommentThread({ ticketId, comments, onAdded, currentUser, onDeleted, users, onTicketRef }) {
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(false);
   const [mentionQuery, setMentionQuery] = useState(null);
@@ -90,6 +98,10 @@ export default function CommentThread({ ticketId, comments, onAdded, currentUser
         return;
       }
     }
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit(e);
+    }
   }
 
   async function handleSubmit(e) {
@@ -153,7 +165,7 @@ export default function CommentThread({ ticketId, comments, onAdded, currentUser
                   {comment.content}
                 </span>
               ) : (
-                renderCommentContent(comment.content, users)
+                renderCommentContent(comment.content, users, onTicketRef)
               )}
               {isDeleted && (
                 <span className="text-muted" style={{ marginLeft: '8px', fontSize: 'var(--font-size-sm)' }}>
