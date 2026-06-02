@@ -3,8 +3,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '@/lib/client-api';
 import { LABEL_COLORS } from '@/lib/constants';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { TagIcon, TrashIcon, XIcon } from '@phosphor-icons/react';
 
-export default function LabelPicker({ ticketId, currentLabels, onUpdate }) {
+export default function LabelPicker({ ticketId, currentLabels = [], onUpdate, onChange }) {
   const [open, setOpen] = useState(false);
   const [labels, setLabels] = useState([]);
   const [search, setSearch] = useState('');
@@ -28,6 +33,11 @@ export default function LabelPicker({ ticketId, currentLabels, onUpdate }) {
   }, [labels, search]);
 
   async function addLabel(labelId) {
+    const label = labels.find((item) => item.id === labelId);
+    if (!ticketId) {
+      if (label && !selectedIds.has(label.id)) onChange?.([...currentLabels, label]);
+      return;
+    }
     await apiFetch(`/api/tickets/${ticketId}/labels`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -37,6 +47,10 @@ export default function LabelPicker({ ticketId, currentLabels, onUpdate }) {
   }
 
   async function removeLabel(labelId) {
+    if (!ticketId) {
+      onChange?.(currentLabels.filter((label) => label.id !== labelId));
+      return;
+    }
     await apiFetch(`/api/tickets/${ticketId}/labels`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
@@ -57,56 +71,71 @@ export default function LabelPicker({ ticketId, currentLabels, onUpdate }) {
       alert(data.error || 'Failed to create label');
       return;
     }
-    await addLabel(data.label.id);
+    setLabels((prev) => {
+      const next = prev.filter((label) => label.id !== data.label.id);
+      return [...next, data.label].sort((a, b) => a.name.localeCompare(b.name));
+    });
+    if (!ticketId) {
+      if (!selectedIds.has(data.label.id)) onChange?.([...currentLabels, data.label]);
+    } else {
+      await addLabel(data.label.id);
+    }
     setNewName('');
     setNewColor(LABEL_COLORS[0].hex);
-    fetchAllLabels();
+    if (ticketId) fetchAllLabels();
   }
 
   async function deleteLabel(labelId) {
     if (!confirm('Delete this label from all tickets?')) return;
     await apiFetch(`/api/labels/${labelId}`, { method: 'DELETE' });
     fetchAllLabels();
-    onUpdate();
+    onChange?.(currentLabels.filter((label) => label.id !== labelId));
+    onUpdate?.();
   }
 
   return (
-    <div>
+    <div className="label-picker">
       <div className="label-list">
         {currentLabels.map((label) => (
-          <span key={label.id} className="label" style={{ backgroundColor: label.color }}>
+          <Badge key={label.id} className="label" style={{ '--label-color': label.color }} variant="outline">
             {label.name}
-            <button type="button" onClick={() => removeLabel(label.id)}>x</button>
-          </span>
+            <Button type="button" size="icon-xs" variant="ghost" onClick={() => removeLabel(label.id)} aria-label={`Remove ${label.name}`}>
+              <XIcon weight="bold" />
+            </Button>
+          </Badge>
         ))}
       </div>
-      <button type="button" className="btn btn-sm mt-md" onClick={() => setOpen((value) => !value)}>
-        + add label
-      </button>
+      <Button type="button" size="sm" variant="outline" className="label-picker-trigger" onClick={() => setOpen((value) => !value)}>
+        <TagIcon weight="bold" />
+        {open ? 'Close labels' : 'Add label'}
+      </Button>
       {open && (
         <div className="label-picker-dropdown">
-          <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search labels" />
-          <div className="mt-md">
+          <Input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search labels" />
+          <div className="label-picker-options">
             {filteredLabels.map((label) => {
               const selected = selectedIds.has(label.id);
               return (
-                <div key={label.id} className="flex-between">
+                <div key={label.id} className="label-picker-row">
                   <button
                     type="button"
                     className="label-picker-item"
                     onClick={() => selected ? removeLabel(label.id) : addLabel(label.id)}
                   >
-                    <span>{selected ? '[x]' : '[ ]'}</span>
-                    <span className="label" style={{ backgroundColor: label.color }}>{label.name}</span>
+                    <Checkbox checked={selected} aria-hidden="true" tabIndex={-1} />
+                    <Badge className="label" style={{ '--label-color': label.color }} variant="outline">{label.name}</Badge>
                   </button>
-                  <button type="button" className="dep-remove" onClick={() => deleteLabel(label.id)}>x</button>
+                  <Button type="button" size="icon-xs" variant="ghost" className="dep-remove" onClick={() => deleteLabel(label.id)} aria-label={`Delete ${label.name}`}>
+                    <TrashIcon weight="bold" />
+                  </Button>
                 </div>
               );
             })}
+            {!filteredLabels.length && <div className="ticket-detail-empty">No matching labels.</div>}
           </div>
           <div className="picker-divider">
             <div className="detail-field-label">Create new label</div>
-            <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Name" />
+            <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Name" />
             <div className="color-grid">
               {LABEL_COLORS.map((color) => (
                 <button
@@ -119,7 +148,7 @@ export default function LabelPicker({ ticketId, currentLabels, onUpdate }) {
                 />
               ))}
             </div>
-            <button type="button" className="btn btn-primary btn-sm" onClick={createLabel}>Create</button>
+            <Button type="button" size="sm" className="tickets-new-button" onClick={createLabel}>Create label</Button>
           </div>
         </div>
       )}

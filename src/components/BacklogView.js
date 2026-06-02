@@ -7,63 +7,98 @@ import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { apiFetch } from '@/lib/client-api';
 import { PRIORITIES } from '@/lib/constants';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { DotsSixVerticalIcon, PlusIcon, TicketIcon } from '@phosphor-icons/react';
+import AppPageHeader from './AppPageHeader';
+import { AppEmptyState } from './AppUI';
 import CreateTicketForm from './CreateTicketForm';
 import TicketDetail from './TicketDetail';
 import TicketFilterBar from './TicketFilterBar';
 
-function SortableRow({ ticket, movableSprints, allSprints, onView, onMoveToSprint, selected, onToggleSelect, showSprint }) {
+function SortableRow({ ticket, movableSprints, allSprints, onView, onMoveToSprint, selected, onToggleSelect, showSprint, isMoving }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: ticket.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
 
   return (
-    <tr ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <td onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} style={{ width: 36, textAlign: 'center' }}>
-        <input
-          type="checkbox"
+    <TableRow
+      ref={setNodeRef}
+      style={style}
+      className="ticket-row"
+      onClick={() => onView(ticket.id)}
+    >
+      <TableCell onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} className="w-9 text-center">
+        <Checkbox
           checked={selected}
-          onChange={onToggleSelect}
+          onCheckedChange={onToggleSelect}
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
         />
-      </td>
-      <td className="backlog-title-cell">
-        <button
+      </TableCell>
+      <TableCell onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} className="ticket-row-drag-cell">
+        <Button
           type="button"
-          className="backlog-title-button"
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => { e.stopPropagation(); onView(ticket.id); }}
+          size="icon-xs"
+          variant="ghost"
+          className="ticket-row-drag-handle"
+          aria-label={`Reorder ${ticket.title}`}
+          {...attributes}
+          {...listeners}
         >
+          <DotsSixVerticalIcon weight="bold" />
+        </Button>
+      </TableCell>
+      <TableCell className="backlog-title-cell">
+        <div className="backlog-row-title">
           {ticket.title}
-        </button>
-      </td>
-      <td><span className={`priority priority-${ticket.priority}`}>{ticket.priority}</span></td>
-      <td className="text-muted">{ticket.assignee_username || '-'}</td>
-      <td>
+        </div>
+      </TableCell>
+      <TableCell>
+        <Badge className={`priority-badge priority-badge-${ticket.priority}`} variant="outline">
+          {ticket.priority}
+        </Badge>
+      </TableCell>
+      <TableCell className="text-muted">{ticket.assignee_username || '-'}</TableCell>
+      <TableCell>
         <span className="label-list">
           {ticket.labels?.map((label) => (
             <span key={label.id} className="label" style={{ backgroundColor: label.color }}>{label.name}</span>
           ))}
         </span>
-      </td>
+      </TableCell>
       {showSprint && (
-        <td className="text-muted" style={{ fontSize: '0.8125rem' }}>
-          {ticket.sprint_id ? (allSprints.find((s) => s.id === ticket.sprint_id)?.name || '—') : <em>Backlog</em>}
-        </td>
+        <TableCell className="text-muted text-xs">
+          {ticket.sprint_id ? (allSprints.find((s) => String(s.id) === String(ticket.sprint_id))?.name || '—') : <em>Backlog</em>}
+        </TableCell>
       )}
-      <td>
-        <select
-          defaultValue=""
-          onPointerDown={(e) => e.stopPropagation()}
-          onMouseDown={(e) => e.stopPropagation()}
-          onClick={(e) => e.stopPropagation()}
-          onChange={(e) => onMoveToSprint(ticket.id, e.target.value)}
+      <TableCell onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
+        <Select
+          disabled={isMoving}
+          value={ticket.sprint_id ? String(ticket.sprint_id) : 'backlog'}
+          onValueChange={async (value) => {
+            if (value) await onMoveToSprint(ticket.id, value);
+          }}
         >
-          <option value="">{ticket.sprint_id ? 'move to…' : 'move to sprint'}</option>
-          {ticket.sprint_id && <option value="backlog">Backlog</option>}
-          {movableSprints.filter((s) => s.id !== ticket.sprint_id).map((sprint) => <option key={sprint.id} value={sprint.id}>{sprint.name}</option>)}
-        </select>
-      </td>
-    </tr>
+          <SelectTrigger className="w-40">
+            <SelectValue placeholder={isMoving ? 'Moving...' : 'Move to sprint'} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="backlog">Backlog</SelectItem>
+            {ticket.sprint_id && (
+              <SelectItem value={String(ticket.sprint_id)} disabled>
+                {allSprints.find((s) => String(s.id) === String(ticket.sprint_id))?.name || 'Current sprint'}
+              </SelectItem>
+            )}
+            {movableSprints
+              .filter((s) => String(s.id) !== String(ticket.sprint_id))
+              .map((sprint) => <SelectItem key={sprint.id} value={String(sprint.id)}>{sprint.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </TableCell>
+    </TableRow>
   );
 }
 
@@ -80,6 +115,7 @@ export default function BacklogView() {
   const [filters, setFilters] = useState({});
   const [scope, setScope] = useState('all');
   const [selected, setSelected] = useState(new Set());
+  const [movingTicketId, setMovingTicketId] = useState(null);
   const debounceTimer = useRef(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
@@ -137,19 +173,38 @@ export default function BacklogView() {
 
   async function moveToSprint(ticketId, sprintId) {
     if (!sprintId) return;
-    if (scope === 'backlog') {
+    const newSprintId = sprintId === 'backlog' ? null : sprintId;
+    const previousTickets = tickets;
+    const previousTotal = total;
+
+    setMovingTicketId(ticketId);
+    if (scope === 'backlog' && newSprintId) {
       setTickets((prev) => prev.filter((ticket) => ticket.id !== ticketId));
       setTotal((prev) => Math.max(0, prev - 1));
     } else {
-      const newSprintId = sprintId === 'backlog' ? null : sprintId;
-      setTickets((prev) => prev.map((t) => t.id === ticketId ? { ...t, sprint_id: newSprintId } : t));
+      setTickets((prev) => prev.map((t) => t.id === ticketId ? { ...t, sprint_id: newSprintId, status: newSprintId ? 'todo' : 'backlog' } : t));
     }
-    const newSprintId = sprintId === 'backlog' ? null : sprintId;
-    await apiFetch(`/api/tickets/${ticketId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sprint_id: newSprintId, status: newSprintId ? 'todo' : 'backlog' }),
-    });
+
+    try {
+      const res = await apiFetch(`/api/tickets/${ticketId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sprint_id: newSprintId, status: newSprintId ? 'todo' : 'backlog' }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to move ticket.');
+
+      if (scope === 'all' && data.ticket) {
+        setTickets((prev) => prev.map((t) => t.id === ticketId ? { ...t, ...data.ticket } : t));
+      }
+      fetchTickets(0);
+    } catch (err) {
+      setTickets(previousTickets);
+      setTotal(previousTotal);
+      alert(err.message);
+    } finally {
+      setMovingTicketId(null);
+    }
   }
 
   function handleDragEnd(event) {
@@ -224,16 +279,42 @@ export default function BacklogView() {
 
   return (
     <div className="page">
-      <div className="page-header">
-        <h1>Tickets</h1>
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <div className="btn-group">
-            <button type="button" className={`btn btn-sm${scope === 'all' ? ' btn-active' : ''}`} onClick={() => handleScopeChange('all')}>All</button>
-            <button type="button" className={`btn btn-sm${scope === 'backlog' ? ' btn-active' : ''}`} onClick={() => handleScopeChange('backlog')}>Backlog only</button>
+      <AppPageHeader
+        icon={TicketIcon}
+        eyebrow="Issues"
+        title="Tickets"
+        subtitle="Triage, assign, and move LA Hacks engineering work."
+        actions={(
+          <div className="tickets-header-actions">
+          <div className="scope-toggle" data-scope={scope}>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              aria-pressed={scope === 'all'}
+              className="scope-toggle-option"
+              onClick={() => handleScopeChange('all')}
+            >
+              All
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              aria-pressed={scope === 'backlog'}
+              className="scope-toggle-option"
+              onClick={() => handleScopeChange('backlog')}
+            >
+              Backlog only
+            </Button>
           </div>
-          <button className="btn btn-sm" onClick={() => setShowCreateForm(true)}>+ New Ticket</button>
+          <Button size="sm" className="tickets-new-button" onClick={() => setShowCreateForm(true)}>
+            <PlusIcon weight="bold" />
+            New ticket
+          </Button>
         </div>
-      </div>
+        )}
+      />
       {showCreateForm && (
         <CreateTicketForm
           users={users}
@@ -244,87 +325,95 @@ export default function BacklogView() {
           onCancel={() => setShowCreateForm(false)}
         />
       )}
-      {!showCreateForm && (
-        <>
-          <TicketFilterBar
-            filters={filters}
-            onChange={handleFiltersChange}
-            users={users}
-            labels={labels}
-            priorities={PRIORITIES}
-          />
-          {selected.size > 0 && (
-            <div className="bulk-bar">
-              <span>{selected.size} selected</span>
-              <select onChange={(e) => handleBulkAction('sprint', e.target.value)} defaultValue="">
-                <option value="">Move to sprint…</option>
-                {movableSprints.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-              <button type="button" className="btn btn-sm" onClick={handleBulkDelete}>Delete</button>
-              <button type="button" className="btn btn-sm" onClick={() => setSelected(new Set())}>Clear</button>
-            </div>
-          )}
-          <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
-            <div className="table-container">
-              <table className="backlog-table">
-                <thead>
-                  <tr>
-                    <th style={{ width: 36, textAlign: 'center' }}>
-                      <input
-                        type="checkbox"
-                        checked={tickets.length > 0 && selected.size === tickets.length}
-                        onChange={toggleSelectAll}
-                      />
-                    </th>
-                    <th className="backlog-title-col">Title</th>
-                    <th style={{ width: 90 }}>Priority</th>
-                    <th style={{ width: 100 }}>Assignee</th>
-                    <th style={{ width: 160 }}>Labels</th>
-                    {showSprint && <th style={{ width: 140 }}>Sprint</th>}
-                    <th style={{ width: 160 }}>Actions</th>
-                  </tr>
-                </thead>
-                <SortableContext items={tickets.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-                  <tbody>
-                    {tickets.map((ticket) => (
-                      <SortableRow
-                        key={ticket.id}
-                        ticket={ticket}
-                        movableSprints={movableSprints}
-                        allSprints={sprints}
-                        onView={setSelectedTicketId}
-                        onMoveToSprint={moveToSprint}
-                        selected={selected.has(ticket.id)}
-                        onToggleSelect={() => toggleSelect(ticket.id)}
-                        showSprint={showSprint}
-                      />
-                    ))}
-                    {!tickets.length && (
-                      <tr>
-                        <td colSpan={showSprint ? 7 : 6}>
-                          <div className="empty">
-                            {Object.values(filters).some(Boolean)
-                              ? 'No tickets match your filters.'
-                              : scope === 'all'
-                                ? <>No tickets yet.{' '}<button type="button" className="btn btn-sm" onClick={() => setShowCreateForm(true)}>Create a ticket</button>{' '}to get started.</>
-                                : <>Your backlog is empty.{' '}<button type="button" className="btn btn-sm" onClick={() => setShowCreateForm(true)}>Create a ticket</button>{' '}to get started.</>
-                            }
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </SortableContext>
-              </table>
-            </div>
-          </DndContext>
-        </>
+      <TicketFilterBar
+        filters={filters}
+        onChange={handleFiltersChange}
+        users={users}
+        labels={labels}
+        priorities={PRIORITIES}
+      />
+      {selected.size > 0 && (
+        <div className="bulk-bar">
+          <span>{selected.size} selected</span>
+          <Select onValueChange={(value) => handleBulkAction('sprint', value)}>
+            <SelectTrigger className="w-44">
+              <SelectValue placeholder="Move to sprint..." />
+            </SelectTrigger>
+            <SelectContent>
+              {movableSprints.map((s) => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Button type="button" size="sm" variant="destructive" onClick={handleBulkDelete}>Delete</Button>
+          <Button type="button" size="sm" variant="outline" onClick={() => setSelected(new Set())}>Clear</Button>
+        </div>
       )}
+      <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
+        <div className="table-container">
+          <Table className="backlog-table">
+            <TableHeader>
+              <TableRow>
+                <TableHead style={{ width: 36, textAlign: 'center' }}>
+                  <Checkbox
+                    checked={tickets.length > 0 && selected.size === tickets.length}
+                    onCheckedChange={toggleSelectAll}
+                  />
+                </TableHead>
+                <TableHead style={{ width: 36 }} aria-label="Reorder" />
+                <TableHead className="backlog-title-col">Title</TableHead>
+                <TableHead style={{ width: 120 }}>Priority</TableHead>
+                <TableHead style={{ width: 140 }}>Assignee</TableHead>
+                <TableHead style={{ width: 180 }}>Labels</TableHead>
+                {showSprint && <TableHead style={{ width: 160 }}>Sprint</TableHead>}
+                <TableHead style={{ width: 180 }}>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <SortableContext items={tickets.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+              <TableBody>
+                {tickets.map((ticket) => (
+                  <SortableRow
+                    key={ticket.id}
+                    ticket={ticket}
+                    movableSprints={movableSprints}
+                    allSprints={sprints}
+                    onView={setSelectedTicketId}
+                    onMoveToSprint={moveToSprint}
+                    selected={selected.has(ticket.id)}
+                    onToggleSelect={() => toggleSelect(ticket.id)}
+                    showSprint={showSprint}
+                    isMoving={movingTicketId === ticket.id}
+                  />
+                ))}
+                {!tickets.length && (
+                  <TableRow>
+                    <TableCell colSpan={showSprint ? 8 : 7}>
+                      {Object.values(filters).some(Boolean) ? (
+                        <AppEmptyState
+                          icon={TicketIcon}
+                          title="No matching tickets"
+                          description="Try clearing filters or searching for another issue."
+                        />
+                      ) : (
+                        <AppEmptyState
+                          icon={TicketIcon}
+                          title={scope === 'all' ? 'No tickets yet' : 'Your backlog is empty'}
+                          description="Create a ticket to start triaging LA Hacks engineering work."
+                          action={<Button type="button" size="sm" className="tickets-new-button" onClick={() => setShowCreateForm(true)}><PlusIcon weight="bold" />Create a ticket</Button>}
+                        />
+                      )}
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </SortableContext>
+          </Table>
+        </div>
+      </DndContext>
       {tickets.length < total && (
         <div style={{ textAlign: 'center', marginTop: '1rem' }}>
-          <button
+          <Button
             type="button"
-            className="btn btn-sm"
+            size="sm"
+            variant="outline"
             onClick={() => {
               const nextOffset = offset + 50;
               setOffset(nextOffset);
@@ -332,7 +421,7 @@ export default function BacklogView() {
             }}
           >
             Load more ({tickets.length}/{total})
-          </button>
+          </Button>
         </div>
       )}
       {selectedTicketId && (

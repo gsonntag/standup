@@ -2,6 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/client-api';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Textarea } from '@/components/ui/textarea';
+import { ArrowLeftIcon, ChatCircleTextIcon, PlusIcon, SmileyIcon, TrashIcon, TrendUpIcon } from '@phosphor-icons/react';
+import AppPageHeader from '@/components/AppPageHeader';
 
 export default function RetroBoard({ sprintId, currentUser }) {
   const [notes, setNotes] = useState([]);
@@ -39,41 +44,66 @@ export default function RetroBoard({ sprintId, currentUser }) {
 
   function renderColumn(title, category, value, setValue) {
     const colNotes = notes.filter((n) => n.category === category);
+    const Icon = category === 'went_well' ? SmileyIcon : TrendUpIcon;
     return (
-      <div className="retro-column">
-        <h3>{title}</h3>
-        <div className="retro-notes">
-          {colNotes.map((note) => (
-            <div key={note.id} className="retro-note">
-              <div className="retro-note-content">{note.content}</div>
-              {(myNoteIds.has(note.id) || currentUser.role === 'admin') && (
-                <button type="button" className="dep-remove" onClick={() => deleteNote(note.id)}>×</button>
-              )}
-            </div>
-          ))}
-          {colNotes.length === 0 && <div className="empty">No notes yet.</div>}
-        </div>
-        <div className="retro-add">
-          <textarea
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            placeholder="Add a note..."
-            rows={2}
-          />
-          <button type="button" className="btn btn-sm btn-primary" onClick={() => handleAdd(category, value, setValue)}>
-            Add
-          </button>
-        </div>
-      </div>
+      <Card className="retro-column">
+        <CardHeader className="retro-column-header">
+          <div className="retro-column-title">
+            <span className="retro-column-icon"><Icon weight="bold" /></span>
+            <CardTitle>{title}</CardTitle>
+          </div>
+          <span className="retro-count">{colNotes.length}</span>
+        </CardHeader>
+        <CardContent>
+          <div className="retro-notes">
+            {colNotes.map((note) => (
+              <div key={note.id} className="retro-note">
+                <div className="retro-note-content">{note.content}</div>
+                {(myNoteIds.has(note.id) || currentUser.role === 'admin') && (
+                  <Button type="button" size="icon-xs" variant="ghost" className="retro-note-delete" onClick={() => deleteNote(note.id)}>
+                    <TrashIcon weight="bold" />
+                    <span className="sr-only">Delete note</span>
+                  </Button>
+                )}
+              </div>
+            ))}
+            {colNotes.length === 0 && (
+              <div className="retro-empty">
+                <ChatCircleTextIcon weight="bold" />
+                <span>No notes yet.</span>
+              </div>
+            )}
+          </div>
+          <div className="retro-add">
+            <Textarea
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              placeholder="Add a note..."
+              rows={3}
+            />
+            <Button type="button" size="sm" className="tickets-new-button" onClick={() => handleAdd(category, value, setValue)}>
+              <PlusIcon weight="bold" />
+              Add note
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 
   return (
     <div className="page">
-      <div className="page-header">
-        <h1>Sprint Retrospective</h1>
-        <a href="/sprints" className="btn btn-sm">← Back to Sprints</a>
+      <div className="retro-back-row">
+        <Button asChild type="button" size="sm" variant="outline">
+          <a href="/sprints"><ArrowLeftIcon weight="bold" />Back to sprints</a>
+        </Button>
       </div>
+      <AppPageHeader
+        icon={ChatCircleTextIcon}
+        eyebrow="Retro"
+        title="Sprint Retrospective"
+        subtitle="Capture what worked, what needs attention, and what the team should adjust next."
+      />
       <div className="retro-board">
         {renderColumn('Went Well', 'went_well', wentWell, setWentWell)}
         {renderColumn('To Improve', 'improve', improve, setImprove)}

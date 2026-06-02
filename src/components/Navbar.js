@@ -3,12 +3,28 @@
 import { useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/client-api';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
+import {
+  ChartBarIcon,
+  CaretUpDownIcon,
+  KanbanIcon,
+  ListChecksIcon,
+  MagnifyingGlassIcon,
+  RowsIcon,
+  SidebarSimpleIcon,
+  SignOutIcon,
+  TicketIcon,
+  UsersIcon,
+} from '@phosphor-icons/react';
 
 const NAV_LINKS = [
-  { href: '/', label: 'Board' },
-  { href: '/tickets', label: 'Tickets' },
-  { href: '/sprints', label: 'Sprints' },
-  { href: '/my-tasks', label: 'My Tasks' },
+  { href: '/', label: 'Board', icon: KanbanIcon },
+  { href: '/tickets', label: 'Tickets', icon: TicketIcon },
+  { href: '/sprints', label: 'Sprints', icon: RowsIcon },
+  { href: '/my-tasks', label: 'My Tasks', icon: ListChecksIcon },
 ];
 
 export default function Navbar({ user }) {
@@ -19,6 +35,7 @@ export default function Navbar({ user }) {
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [collapsed, setCollapsed] = useState(false);
   const debounceRef = useRef(null);
   const containerRef = useRef(null);
   const searchInputRef = useRef(null);
@@ -47,6 +64,23 @@ export default function Navbar({ user }) {
   useEffect(() => {
     apiFetch('/api/me/mentions').then((r) => r.json()).then((d) => setUnreadCount(d.unread_count || 0));
   }, []);
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem('standup-sidebar-collapsed') === 'true';
+    setCollapsed(saved);
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem('standup-theme', 'light');
+    document.documentElement.dataset.theme = 'light';
+    document.documentElement.classList.remove('dark');
+  }, []);
+
+  useEffect(() => {
+    document.body.classList.toggle('sidebar-collapsed', collapsed);
+    window.localStorage.setItem('standup-sidebar-collapsed', String(collapsed));
+    return () => document.body.classList.remove('sidebar-collapsed');
+  }, [collapsed]);
 
   function handleSearchChange(e) {
     const val = e.target.value;
@@ -90,24 +124,33 @@ export default function Navbar({ user }) {
   }
 
   return (
-    <nav className="navbar">
-      <a href="/" className="navbar-brand">Standup</a>
-      <ul className="navbar-links">
-        {NAV_LINKS.map((link) => (
-          <li key={link.href}>
-            <a href={link.href} className={pathname === link.href ? 'active' : ''}>
-              {link.label}
-              {link.href === '/my-tasks' && unreadCount > 0 && ` (${unreadCount})`}
-            </a>
-          </li>
-        ))}
-      </ul>
-      <div style={{ position: 'relative' }} ref={containerRef}>
-        <input
+    <nav className="navbar app-sidebar" data-collapsed={collapsed}>
+      <div className="sidebar-top">
+        <a href="/" className="navbar-brand">
+          <span className="sidebar-logo">
+            <img src="/la-hacks-logo.png" alt="" />
+          </span>
+          <span className="sidebar-label">Standup</span>
+        </a>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="sidebar-collapse-button"
+          onClick={() => setCollapsed((value) => !value)}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          <SidebarSimpleIcon weight="bold" />
+        </Button>
+      </div>
+
+      <div className="sidebar-search" ref={containerRef}>
+        <MagnifyingGlassIcon weight="bold" />
+        <Input
           ref={searchInputRef}
           type="text"
           className="navbar-search"
-          placeholder="Search… (/)"
+          placeholder="Search..."
           value={query}
           onChange={handleSearchChange}
           onKeyDown={handleSearchKeyDown}
@@ -116,31 +159,75 @@ export default function Navbar({ user }) {
         {showDropdown && results.length > 0 && (
           <div className="search-dropdown">
             {results.map((result, i) => (
-              <div
+              <button
+                type="button"
                 key={result.id}
                 className={`search-result${i === selectedIndex ? ' selected' : ''}`}
                 onClick={() => openResult(result)}
               >
                 <span className="text-mono text-muted">#{result.number}</span>
-                {' '}{result.title}
-                {result.sprint_name && <span className="text-muted"> — {result.sprint_name}</span>}
-                <span className="label-list" style={{ marginLeft: 'auto' }}>
+                <span>{result.title}</span>
+                {result.sprint_name && <span className="text-muted">- {result.sprint_name}</span>}
+                <span className="label-list">
                   {result.labels?.map((l) => (
                     <span key={l.id} className="label" style={{ backgroundColor: l.color }}>{l.name}</span>
                   ))}
                 </span>
-              </div>
+              </button>
             ))}
           </div>
         )}
       </div>
-      <div className="navbar-right">
+
+      <ul className="navbar-links">
+        {NAV_LINKS.map((link) => (
+          <li key={link.href}>
+            <a href={link.href} className={pathname === link.href ? 'active' : ''} title={link.label}>
+              <link.icon weight="bold" />
+              <span className="sidebar-label">{link.label}</span>
+              {link.href === '/my-tasks' && unreadCount > 0 && (
+                <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px]">{unreadCount}</Badge>
+              )}
+            </a>
+          </li>
+        ))}
+      </ul>
+      <div className="sidebar-secondary">
         {user.role === 'admin' && (
-          <a href="/dashboard" className={`text-muted${pathname === '/dashboard' ? ' active' : ''}`} style={{ fontSize: '0.875rem' }}>Dashboard</a>
+          <a href="/dashboard" className={pathname === '/dashboard' ? 'active' : ''} title="Dashboard">
+            <ChartBarIcon weight="bold" />
+            <span className="sidebar-label">Dashboard</span>
+          </a>
         )}
-        <a href="/team" className={`text-muted${pathname === '/team' ? ' active' : ''}`} style={{ fontSize: '0.875rem' }}>Team</a>
-        <span className="navbar-user">{user.username}</span>
-        <button type="button" onClick={handleLogout} className="btn btn-sm">logout</button>
+        <a href="/team" className={pathname === '/team' ? 'active' : ''} title="Team">
+          <UsersIcon weight="bold" />
+          <span className="sidebar-label">Team</span>
+        </a>
+      </div>
+      <div className="navbar-right">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button type="button" variant="ghost" className="navbar-user-menu" title={`${user.username} account menu`}>
+              <span className="avatar-dot">{user.username.slice(0, 2)}</span>
+              <span className="sidebar-label navbar-user-copy">
+                <span className="navbar-user-name">{user.username}</span>
+                <span className="navbar-user-role">{user.role}</span>
+              </span>
+              <CaretUpDownIcon className="navbar-user-chevron sidebar-label" weight="bold" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" side="right" sideOffset={10} className="navbar-account-menu">
+            <DropdownMenuLabel className="navbar-account-label">
+              <span className="avatar-dot">{user.username.slice(0, 2)}</span>
+              <span>
+                <span className="navbar-user-name">{user.username}</span>
+                <span className="navbar-user-role">{user.role}</span>
+              </span>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="navbar-account-item" onClick={handleLogout}><SignOutIcon weight="bold" />Log out</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </nav>
   );

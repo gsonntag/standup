@@ -5,6 +5,31 @@ import { apiFetch } from '@/lib/client-api';
 import { PRIORITIES, STATUSES } from '@/lib/constants';
 import { parseTimestamp, timeAgo } from '@/lib/dates';
 import { uploadPastedImage } from '@/lib/description-paste';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  ActivityIcon,
+  ArchiveIcon,
+  CalendarBlankIcon,
+  ChatCircleTextIcon,
+  CheckCircleIcon,
+  GitCommitIcon,
+  GitForkIcon,
+  LinkIcon,
+  PaperclipIcon,
+  PencilSimpleIcon,
+  TagIcon,
+  TrashIcon,
+  UserCircleIcon,
+  UsersIcon,
+  XIcon,
+} from '@phosphor-icons/react';
 import CommentThread from './CommentThread';
 import { useRealtime } from '@/lib/realtime';
 import DescriptionPreview from './DescriptionPreview';
@@ -325,11 +350,11 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
 
   if (!ticket) {
     return (
-      <div className="modal-overlay" onClick={() => onClose()}>
-        <div className="modal" onClick={(e) => e.stopPropagation()}>
-          <div className="modal-body">Loading...</div>
-        </div>
-      </div>
+      <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+        <DialogContent>
+          Loading...
+        </DialogContent>
+      </Dialog>
     );
   }
 
@@ -345,294 +370,423 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
   ].sort((a, b) => parseTimestamp(a.created_at) - parseTimestamp(b.created_at));
 
   return (
-    <div className="modal-overlay" onClick={() => onClose({ updated: true })}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2 className="flex gap-md" style={{ flex: 1 }}>
-            <span className="text-mono text-muted">#{ticket.number}</span>
+    <Dialog open onOpenChange={(open) => { if (!open) onClose({ updated: true }); }}>
+      <DialogContent className="ticket-detail-dialog-modern" showCloseButton={false}>
+        <DialogHeader className="ticket-detail-header">
+          <div className="ticket-detail-title-block">
+            <div className="ticket-detail-kicker">
+              <Badge variant="outline">#{ticket.number}</Badge>
+              <Badge variant={ticket.status === 'done' ? 'secondary' : 'outline'}>{ticket.status.replaceAll('_', ' ')}</Badge>
+              {ticket.priority && (
+                <Badge className={`priority-badge priority-badge-${ticket.priority}`} variant="outline">
+                  {ticket.priority}
+                </Badge>
+              )}
+            </div>
+            <DialogTitle asChild>
+              <div>
+                {isEditing ? (
+                  <Input
+                    className="ticket-detail-title-input"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    autoFocus
+                  />
+                ) : (
+                  <h2 className="ticket-detail-title-view">{ticket.title}</h2>
+                )}
+              </div>
+            </DialogTitle>
+          </div>
+          <div className="ticket-detail-actions">
             {isEditing ? (
-              <input
-                className="detail-title-input"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-              />
+              <>
+                <Button type="button" size="sm" className="tickets-new-button" onClick={finishEditing}>
+                  <CheckCircleIcon weight="bold" />
+                  Save
+                </Button>
+                <Button type="button" size="sm" variant="outline" onClick={cancelEditing}>Cancel</Button>
+              </>
             ) : (
-              <span className="detail-title-view">{ticket.title}</span>
+              <Button type="button" size="sm" variant="outline" onClick={startEditing}>
+                <PencilSimpleIcon weight="bold" />
+                Edit title and description
+              </Button>
             )}
-          </h2>
-          {isEditing ? (
-            <div className="flex gap-sm">
-              <button type="button" className="btn btn-primary btn-sm" onClick={finishEditing}>Done</button>
-              <button type="button" className="btn btn-sm" onClick={cancelEditing}>Cancel</button>
-            </div>
-          ) : (
-            <button type="button" className="btn btn-sm" onClick={startEditing}>Edit</button>
-          )}
-          <button type="button" className="modal-close" onClick={() => onClose({ updated: true })}>x</button>
-        </div>
-        <div className="modal-body">
-          <div className="detail-grid">
-            <div className="detail-main">
-              <div className="detail-field">
-                <div className="flex-between mb-md">
-                  <div className="detail-field-label">Description</div>
-                  {isEditing && <ImageUploadButton onUploaded={appendDescriptionImage} />}
+            <Button type="button" size="icon-sm" variant="ghost" onClick={() => onClose({ updated: true })}>
+              <XIcon weight="bold" />
+              <span className="sr-only">Close</span>
+            </Button>
+          </div>
+        </DialogHeader>
+
+        <div className="ticket-detail-layout">
+          <main className="ticket-detail-main">
+            <section className="ticket-detail-section">
+              <div className="ticket-detail-section-header">
+                <div>
+                  <h3>Description</h3>
+                  <p>Markdown, screenshots, and acceptance criteria live here.</p>
                 </div>
-                {isEditing ? (
-                  <>
-                    <textarea
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      onPaste={handleDescriptionPaste}
-                      rows={14}
-                    />
-                    <DescriptionPreview value={description} />
-                  </>
-                ) : (
-                  <DescriptionPreview value={ticket.description || ''} />
-                )}
+                {isEditing && <ImageUploadButton onUploaded={appendDescriptionImage} />}
               </div>
-              <div className="detail-field">
-                <div className="detail-field-label">Comments</div>
-                <CommentThread
-                  ticketId={activeTicketId}
-                  comments={comments}
-                  currentUser={currentUser}
-                  users={users}
-                  onAdded={(comment) => setComments((prev) => [...prev, comment])}
-                  onDeleted={(commentId) =>
-                    setComments((prev) =>
-                      prev.map((c) =>
-                        c.id === commentId
-                          ? { ...c, deleted_at: new Date().toISOString(), deleted_by_username: currentUser?.username }
-                          : c
+              {isEditing ? (
+                <div className="ticket-description-editor">
+                  <Textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    onPaste={handleDescriptionPaste}
+                    rows={12}
+                  />
+                  <DescriptionPreview value={description} />
+                </div>
+              ) : (
+                <DescriptionPreview value={ticket.description || ''} className="ticket-description-preview" />
+              )}
+            </section>
+
+            <Tabs defaultValue="comments" className="ticket-detail-tabs">
+              <TabsList className="ticket-detail-tabs-list">
+                <TabsTrigger value="comments"><ChatCircleTextIcon weight="bold" />Comments</TabsTrigger>
+                <TabsTrigger value="activity"><ActivityIcon weight="bold" />Activity</TabsTrigger>
+                <TabsTrigger value="commits"><GitCommitIcon weight="bold" />Commits</TabsTrigger>
+                <TabsTrigger value="attachments"><PaperclipIcon weight="bold" />Attachments</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="comments">
+                <section className="ticket-detail-section">
+                  <CommentThread
+                    ticketId={activeTicketId}
+                    comments={comments}
+                    currentUser={currentUser}
+                    users={users}
+                    onAdded={(comment) => setComments((prev) => [...prev, comment])}
+                    onDeleted={(commentId) =>
+                      setComments((prev) =>
+                        prev.map((c) =>
+                          c.id === commentId
+                            ? { ...c, deleted_at: new Date().toISOString(), deleted_by_username: currentUser?.username }
+                            : c
+                        )
                       )
-                    )
-                  }
-                />
-              </div>
-              <div className="detail-field">
-                <div className="flex-between mb-md">
-                  <div className="detail-field-label">Related commits</div>
-                  <button
-                    type="button"
-                    className="btn btn-sm"
-                    disabled={!ticket.github_repo_id}
-                    onClick={() => {
-                      const nextOpen = !commitPickerOpen;
-                      setCommitPickerOpen(nextOpen);
-                      if (nextOpen) fetchCommitOptions();
-                    }}
-                  >
-                    Link commits
-                  </button>
-                </div>
-                {!ticket.github_repo_id && <div className="empty compact-empty">Select a repository before linking commits.</div>}
-                {ticket.github_repo_id && relatedCommits.length === 0 && <div className="empty compact-empty">No commits linked</div>}
-                {relatedCommits.length > 0 && (
-                  <ul className="commit-list">
-                    {relatedCommits.map((commit) => (
-                      <li className="commit-row" key={commit.sha}>
-                        <div className="commit-main">
-                          <a href={commit.html_url} target="_blank" rel="noopener noreferrer" className="text-mono">{commit.short_sha}</a>
-                          <span>{firstLine(commit.message)}</span>
-                          <span className="text-muted text-sm">{commit.author_login || commit.author_name || 'unknown'} · {timeAgo(commit.committed_at)}</span>
-                          {branchText(commit) && <span className="text-muted text-sm">{branchText(commit)}</span>}
-                        </div>
-                        <button type="button" className="btn btn-sm" onClick={() => unlinkCommit(commit.sha)}>Unlink</button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {commitPickerOpen && ticket.github_repo_id && (
-                  <div className="label-picker-dropdown commit-picker">
-                    <div className="flex gap-sm mb-md">
-                      <input
-                        type="search"
-                        value={commitSearch}
-                        onChange={(e) => setCommitSearch(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') fetchCommitOptions(commitSearch);
-                        }}
-                        placeholder="Search commits"
-                      />
-                      <button type="button" className="btn btn-sm" onClick={() => fetchCommitOptions(commitSearch)} disabled={commitLoading}>Search</button>
-                      <button type="button" className="btn btn-sm" onClick={syncCommits} disabled={commitSyncing}>
-                        {commitSyncing ? 'Refreshing...' : 'Refresh from GitHub'}
-                      </button>
-                    </div>
-                    {commitError && <div className="form-error">{commitError}</div>}
-                    {commitLoading && <div className="empty compact-empty">Loading commits...</div>}
-                    {!commitLoading && commitOptions.length === 0 && <div className="empty compact-empty">No cached commits</div>}
-                    {!commitLoading && commitOptions.length > 0 && (
-                      <ul className="commit-list">
-                        {commitOptions.map((commit) => (
-                          <li className="commit-row" key={commit.sha}>
-                            <div className="commit-main">
-                              <span className="text-mono">{commit.short_sha}</span>
-                              <span>{firstLine(commit.message)}</span>
-                              <span className="text-muted text-sm">{commit.author_login || commit.author_name || 'unknown'} · {timeAgo(commit.committed_at)}</span>
-                              {branchText(commit) && <span className="text-muted text-sm">{branchText(commit)}</span>}
-                            </div>
-                            <button type="button" className="btn btn-sm" disabled={commit.linked} onClick={() => linkCommit(commit.sha)}>
-                              {commit.linked ? 'Linked' : 'Link'}
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
+                    }
+                  />
+                </section>
+              </TabsContent>
+
+              <TabsContent value="activity">
+                <section className="ticket-detail-section">
+                  <div className="ticket-activity-list">
+                    {activityItems.filter((item) => item._type === 'event').length === 0 && (
+                      <div className="ticket-detail-empty">No recent activity.</div>
                     )}
+                    {activityItems.map((item) => {
+                      if (item._type === 'event' && item.kind === 'field_change') {
+                        return (
+                          <div className="event-row" key={item.id}>
+                            <ActivityIcon weight="bold" />
+                            <span>
+                              <strong>{item.actor_username}</strong> changed {item.field}
+                              {item.field !== 'description' && <> from {resolveEventValue(item.field, item.old_value)} to {resolveEventValue(item.field, item.new_value)}</>}
+                            </span>
+                            <span className="comment-date">{timeAgo(item.created_at)}</span>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })}
                   </div>
-                )}
-              </div>
-              <div className="detail-field">
-                <div className="detail-field-label">Activity</div>
-                {activityItems.map((item) => {
-                  if (item._type === 'event' && item.kind === 'field_change') {
-                    return (
-                      <div className="event-row" key={item.id}>
-                        <span className="text-muted">
-                          {item.actor_username} changed {item.field}{item.field !== 'description' && <>: {resolveEventValue(item.field, item.old_value)} → {resolveEventValue(item.field, item.new_value)}</>}
-                        </span>
-                        <span className="text-muted comment-date">{timeAgo(item.created_at)}</span>
+                </section>
+              </TabsContent>
+
+              <TabsContent value="commits">
+                <section className="ticket-detail-section">
+                  <div className="ticket-detail-section-header">
+                    <div>
+                      <h3>Related commits</h3>
+                      <p>Link repository work back to this issue.</p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={!ticket.github_repo_id}
+                      onClick={() => {
+                        const nextOpen = !commitPickerOpen;
+                        setCommitPickerOpen(nextOpen);
+                        if (nextOpen) fetchCommitOptions();
+                      }}
+                    >
+                      <GitCommitIcon weight="bold" />
+                      Link commits
+                    </Button>
+                  </div>
+                  {!ticket.github_repo_id && <div className="ticket-detail-empty">Select a repository before linking commits.</div>}
+                  {ticket.github_repo_id && relatedCommits.length === 0 && <div className="ticket-detail-empty">No commits linked.</div>}
+                  {relatedCommits.length > 0 && (
+                    <ul className="commit-list">
+                      {relatedCommits.map((commit) => (
+                        <li className="commit-row" key={commit.sha}>
+                          <div className="commit-main">
+                            <a href={commit.html_url} target="_blank" rel="noopener noreferrer" className="text-mono">{commit.short_sha}</a>
+                            <span>{firstLine(commit.message)}</span>
+                            <span className="text-muted text-sm">{commit.author_login || commit.author_name || 'unknown'} · {timeAgo(commit.committed_at)}</span>
+                            {branchText(commit) && <span className="text-muted text-sm">{branchText(commit)}</span>}
+                          </div>
+                          <Button type="button" size="sm" variant="outline" onClick={() => unlinkCommit(commit.sha)}>Unlink</Button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {commitPickerOpen && ticket.github_repo_id && (
+                    <div className="label-picker-dropdown commit-picker">
+                      <div className="ticket-detail-inline-controls">
+                        <Input
+                          type="search"
+                          value={commitSearch}
+                          onChange={(e) => setCommitSearch(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') fetchCommitOptions(commitSearch);
+                          }}
+                          placeholder="Search commits"
+                        />
+                        <Button type="button" size="sm" variant="outline" onClick={() => fetchCommitOptions(commitSearch)} disabled={commitLoading}>Search</Button>
+                        <Button type="button" size="sm" variant="outline" onClick={syncCommits} disabled={commitSyncing}>
+                          {commitSyncing ? 'Refreshing...' : 'Refresh from GitHub'}
+                        </Button>
                       </div>
-                    );
-                  }
-                  return null;
-                })}
-              </div>
-            </div>
-            <aside className="detail-sidebar">
-              <div className="detail-field">
-                <div className="detail-field-label">Created by</div>
-                <div className="detail-value">{ticket.creator_username}</div>
-              </div>
-              <div className="detail-field">
-                <div className="detail-field-label">Status</div>
-                {isEditing ? (
-                  <select id="detail-status" value={ticket.status} onChange={(e) => updateField('status', e.target.value)}>
-                    {STATUSES.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}
-                  </select>
-                ) : (
-                  <div className="detail-value">{ticket.status}</div>
-                )}
-              </div>
-              <div className="detail-field">
-                <div className="detail-field-label">Priority</div>
-                {isEditing ? (
-                  <select id="detail-priority" value={ticket.priority} onChange={(e) => updateField('priority', e.target.value)}>
-                    {PRIORITIES.map((priority) => <option key={priority.value} value={priority.value}>{priority.label}</option>)}
-                  </select>
-                ) : (
-                  <span className={`priority priority-${ticket.priority}`}>{ticket.priority}</span>
-                )}
-              </div>
-              <div className="detail-field">
-                <div className="detail-field-label">Total Points</div>
-                <input
-                  type="number"
-                  min="1"
-                  style={{ width: '80px' }}
-                  value={totalPointsInput}
-                  onChange={(e) => setTotalPointsInput(e.target.value)}
-                  onBlur={() => {
-                    const val = totalPointsInput === '' ? null : parseInt(totalPointsInput, 10);
-                    if (totalPointsInput !== '' && (isNaN(val) || val < 1)) return;
-                    const current = ticket.total_points ?? null;
-                    if (val !== current) updateField('total_points', val);
-                  }}
-                  placeholder="—"
-                />
-              </div>
-              <div className="detail-field">
-                <div className="detail-field-label">Points Remaining</div>
-                <input
-                  type="number"
-                  min="0"
-                  style={{ width: '80px' }}
-                  value={pointsRemainingInput}
-                  onChange={(e) => setPointsRemainingInput(e.target.value)}
-                  onBlur={() => {
-                    const val = pointsRemainingInput === '' ? null : parseInt(pointsRemainingInput, 10);
-                    if (pointsRemainingInput !== '' && (isNaN(val) || val < 0)) return;
-                    const current = ticket.points_remaining ?? null;
-                    if (val !== current) updateField('points_remaining', val);
-                  }}
-                  placeholder="—"
-                />
-              </div>
-              <div className="detail-field">
-                <div className="detail-field-label">Due Date</div>
-                <input
-                  type="date"
-                  value={ticket.due_date || ''}
-                  onChange={(e) => updateField('due_date', e.target.value || null)}
-                />
-                <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  {sprintEndDate && (
-                    <div className="flex gap-sm" style={{ flexWrap: 'wrap' }}>
-                      <button
-                        type="button"
-                        className="btn btn-sm"
-                        onClick={() => updateField('due_date', sprintEndDate)}
-                      >End of Sprint</button>
+                      {commitError && <div className="form-error">{commitError}</div>}
+                      {commitLoading && <div className="ticket-detail-empty">Loading commits...</div>}
+                      {!commitLoading && commitOptions.length === 0 && <div className="ticket-detail-empty">No cached commits.</div>}
+                      {!commitLoading && commitOptions.length > 0 && (
+                        <ul className="commit-list">
+                          {commitOptions.map((commit) => (
+                            <li className="commit-row" key={commit.sha}>
+                              <div className="commit-main">
+                                <span className="text-mono">{commit.short_sha}</span>
+                                <span>{firstLine(commit.message)}</span>
+                                <span className="text-muted text-sm">{commit.author_login || commit.author_name || 'unknown'} · {timeAgo(commit.committed_at)}</span>
+                                {branchText(commit) && <span className="text-muted text-sm">{branchText(commit)}</span>}
+                              </div>
+                              <Button type="button" size="sm" variant="outline" disabled={commit.linked} onClick={() => linkCommit(commit.sha)}>
+                                {commit.linked ? 'Linked' : 'Link'}
+                              </Button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </div>
                   )}
-                  <div className="flex gap-sm" style={{ flexWrap: 'wrap' }}>
-                    <button type="button" className="btn btn-sm" onClick={() => updateField('due_date', dateFromToday(0))}>Today</button>
-                    <button type="button" className="btn btn-sm" onClick={() => updateField('due_date', dateFromToday(1))}>+1</button>
-                    <button type="button" className="btn btn-sm" onClick={() => updateField('due_date', dateFromToday(2))}>+2</button>
-                    <button type="button" className="btn btn-sm" onClick={() => updateField('due_date', dateFromToday(7))}>+7</button>
+                </section>
+              </TabsContent>
+
+              <TabsContent value="attachments">
+                <section className="ticket-detail-section">
+                  <div className="ticket-detail-section-header">
+                    <div>
+                      <h3>Attachments</h3>
+                      <p>Upload screenshots or supporting files for the team.</p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={attachUploading}
+                      onClick={() => attachFileRef.current?.click()}
+                    >
+                      <PaperclipIcon weight="bold" />
+                      {attachUploading ? 'Uploading...' : 'Attach file'}
+                    </Button>
                   </div>
+                  <input
+                    ref={attachFileRef}
+                    className="hidden"
+                    type="file"
+                    accept="image/png,image/jpeg,image/gif,image/webp"
+                    onChange={handleAttachFile}
+                  />
+                  {!ticket.attachments?.length && <div className="ticket-detail-empty">No attachments yet.</div>}
+                  {ticket.attachments?.length > 0 && (
+                    <ul className="ticket-attachment-list">
+                      {ticket.attachments.map((att) => (
+                        <li key={att.id}>
+                          <PaperclipIcon weight="bold" />
+                          <a href={att.url} target="_blank" rel="noopener noreferrer">{att.filename}</a>
+                          <span>{formatBytes(att.size_bytes)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </section>
+              </TabsContent>
+            </Tabs>
+          </main>
+
+          <aside className="ticket-detail-sidebar-modern">
+            <div className="ticket-property-card">
+              <div className="ticket-property-header">
+                <UserCircleIcon weight="bold" />
+                People
+              </div>
+              <div className="ticket-property-field">
+                <Label>Created by</Label>
+                <div className="ticket-person-pill">@{ticket.creator_username}</div>
+              </div>
+              <div className="ticket-property-field">
+                <Label>Primary assignee</Label>
+                <Select value={ticket.assignee_id || 'unassigned'} onValueChange={(value) => updateField('assignee_id', value === 'unassigned' ? '' : value)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                    {users.map((user) => <SelectItem key={user.id} value={user.id}>{user.username}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="ticket-property-field">
+                <Label>Watchers</Label>
+                <div className="ticket-pill-list">
+                  {ticket.watchers?.map((w) => <span key={w.id} className="ticket-person-pill">@{w.username}</span>)}
+                  {!ticket.watchers?.length && <span className="text-muted">None</span>}
+                </div>
+                {currentUser && (
+                  <Button type="button" size="sm" variant="outline" onClick={toggleWatcher}>
+                    <UsersIcon weight="bold" />
+                    {ticket.watchers?.some((w) => w.id === currentUser.id) ? 'Unwatch' : 'Watch'}
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            <div className="ticket-property-card">
+              <div className="ticket-property-header">
+                <ArchiveIcon weight="bold" />
+                Properties
+              </div>
+              <div className="ticket-property-field">
+                <Label>Status</Label>
+                <Select value={ticket.status} onValueChange={(value) => updateField('status', value)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {STATUSES.map((status) => <SelectItem key={status.value} value={status.value}>{status.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="ticket-property-field">
+                <Label>Priority</Label>
+                <Select value={ticket.priority} onValueChange={(value) => updateField('priority', value)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {PRIORITIES.map((priority) => <SelectItem key={priority.value} value={priority.value}>{priority.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="ticket-property-grid">
+                <div className="ticket-property-field">
+                  <Label>Total points</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    value={totalPointsInput}
+                    onChange={(e) => setTotalPointsInput(e.target.value)}
+                    onBlur={() => {
+                      const val = totalPointsInput === '' ? null : parseInt(totalPointsInput, 10);
+                      if (totalPointsInput !== '' && (isNaN(val) || val < 1)) return;
+                      const current = ticket.total_points ?? null;
+                      if (val !== current) updateField('total_points', val);
+                    }}
+                    placeholder="-"
+                  />
+                </div>
+                <div className="ticket-property-field">
+                  <Label>Remaining</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={pointsRemainingInput}
+                    onChange={(e) => setPointsRemainingInput(e.target.value)}
+                    onBlur={() => {
+                      const val = pointsRemainingInput === '' ? null : parseInt(pointsRemainingInput, 10);
+                      if (pointsRemainingInput !== '' && (isNaN(val) || val < 0)) return;
+                      const current = ticket.points_remaining ?? null;
+                      if (val !== current) updateField('points_remaining', val);
+                    }}
+                    placeholder="-"
+                  />
                 </div>
               </div>
-              <div className="detail-field">
-                <div className="detail-field-label">Assignee</div>
-                <select id="detail-assignee" value={ticket.assignee_id || ''} onChange={(e) => updateField('assignee_id', e.target.value)}>
-                  <option value="">Unassigned</option>
-                  {users.map((user) => <option key={user.id} value={user.id}>{user.username}</option>)}
-                </select>
+              <div className="ticket-property-field">
+                <Label>Due date</Label>
+                <Input type="date" value={ticket.due_date || ''} onChange={(e) => updateField('due_date', e.target.value || null)} />
+                <div className="ticket-detail-shortcuts">
+                  {sprintEndDate && <Button type="button" size="xs" variant="outline" onClick={() => updateField('due_date', sprintEndDate)}><CalendarBlankIcon weight="bold" />End of sprint</Button>}
+                  <Button type="button" size="xs" variant="outline" onClick={() => updateField('due_date', dateFromToday(0))}>Today</Button>
+                  <Button type="button" size="xs" variant="outline" onClick={() => updateField('due_date', dateFromToday(1))}>+1</Button>
+                  <Button type="button" size="xs" variant="outline" onClick={() => updateField('due_date', dateFromToday(7))}>+7</Button>
+                </div>
               </div>
-              <div className="detail-field">
-                <div className="detail-field-label">Sprint</div>
-                <select id="detail-sprint" value={ticket.sprint_id || ''} onChange={(e) => updateField('sprint_id', e.target.value)}>
-                  <option value="">Backlog</option>
-                  {sprints.filter((sprint) => sprint.status !== 'completed').map((sprint) => (
-                    <option key={sprint.id} value={sprint.id}>{sprint.name}</option>
-                  ))}
-                </select>
+            </div>
+
+            <div className="ticket-property-card">
+              <div className="ticket-property-header">
+                <GitForkIcon weight="bold" />
+                Planning
               </div>
-              <div className="detail-field">
-                <div className="detail-field-label">Repository</div>
-                <select id="detail-github-repo" value={ticket.github_repo_id || ''} onChange={(e) => updateField('github_repo_id', e.target.value)}>
-                  <option value="">No repository</option>
-                  {repositories.map((repo) => <option key={repo.id} value={repo.id}>{repo.full_name}</option>)}
-                </select>
+              <div className="ticket-property-field">
+                <Label>Sprint</Label>
+                <Select value={ticket.sprint_id || 'backlog'} onValueChange={(value) => updateField('sprint_id', value === 'backlog' ? '' : value)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="backlog">Backlog</SelectItem>
+                    {sprints.filter((sprint) => sprint.status !== 'completed').map((sprint) => (
+                      <SelectItem key={sprint.id} value={sprint.id}>{sprint.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="ticket-property-field">
+                <Label>Repository</Label>
+                <Select value={ticket.github_repo_id || 'none'} onValueChange={(value) => updateField('github_repo_id', value === 'none' ? '' : value)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No repository</SelectItem>
+                    {repositories.map((repo) => <SelectItem key={repo.id} value={repo.id}>{repo.full_name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
                 {ticket.github_repository && (
-                  <a href={ticket.github_repository.html_url} target="_blank" rel="noopener noreferrer" className="detail-value" style={{ display: 'inline-block', marginTop: '0.25rem' }}>
-                    Open {ticket.github_repository.owner}/{ticket.github_repository.name} ↗
+                  <a href={ticket.github_repository.html_url} target="_blank" rel="noopener noreferrer" className="ticket-external-link">
+                    <LinkIcon weight="bold" />
+                    Open repository
                   </a>
                 )}
               </div>
-              <div className="detail-field">
-                <div className="detail-field-label">Labels</div>
+              <div className="ticket-property-field">
+                <Label><TagIcon weight="bold" /> Labels</Label>
                 <LabelPicker ticketId={activeTicketId} currentLabels={ticket.labels || []} onUpdate={fetchTicket} />
               </div>
-              <div className="detail-field">
-                <div className="detail-field-label">Blocked by</div>
+            </div>
+
+            <div className="ticket-property-card">
+              <div className="ticket-property-header">
+                <GitForkIcon weight="bold" />
+                Dependencies
+              </div>
+              <div className="ticket-property-field">
+                <Label>Blocked by</Label>
                 <ul className="dep-list">
                   {ticket.blockers?.map((blocker) => (
                     <li className="dep-item" key={blocker.id}>
-                      <span className={blocker.status === 'done' ? 'dep-status-done' : 'dep-status-pending'}>
-                        {blocker.status === 'done' ? 'done' : 'open'}
-                      </span>
+                      <Badge variant={blocker.status === 'done' ? 'secondary' : 'outline'}>{blocker.status === 'done' ? 'done' : 'open'}</Badge>
                       <button type="button" className="label-picker-item" onClick={() => setActiveTicketId(blocker.id)}>
                         #{blocker.number} {blocker.title}
                       </button>
-                      <button type="button" className="dep-remove" onClick={() => removeDependency(blocker.id)}>x</button>
+                      <Button type="button" size="icon-xs" variant="ghost" onClick={() => removeDependency(blocker.id)}><XIcon weight="bold" /></Button>
                     </li>
                   ))}
+                  {!ticket.blockers?.length && <li className="ticket-detail-muted-row">No blockers.</li>}
                 </ul>
-                <button type="button" className="btn btn-sm mt-md" onClick={() => setShowDependencyPicker((value) => !value)}>+ add blocker</button>
+                <Button type="button" size="sm" variant="outline" onClick={() => setShowDependencyPicker((value) => !value)}>Add blocker</Button>
                 {showDependencyPicker && (
                   <DependencyPicker
                     ticketId={activeTicketId}
@@ -644,8 +798,8 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
                   />
                 )}
               </div>
-              <div className="detail-field">
-                <div className="detail-field-label">Unblocks</div>
+              <div className="ticket-property-field">
+                <Label>Unblocks</Label>
                 <ul className="dep-list">
                   {ticket.unblocks?.map((item) => (
                     <li className="dep-item" key={item.id}>
@@ -654,65 +808,20 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
                       </button>
                     </li>
                   ))}
+                  {!ticket.unblocks?.length && <li className="ticket-detail-muted-row">No dependent tickets.</li>}
                 </ul>
               </div>
-              <div className="detail-field">
-                <div className="detail-field-label">Watchers</div>
-                <div className="flex gap-sm" style={{ flexWrap: 'wrap', marginBottom: '4px' }}>
-                  {ticket.watchers?.map((w) => (
-                    <span key={w.id} className="label" style={{ backgroundColor: 'var(--text-muted)' }}>@{w.username}</span>
-                  ))}
-                  {!ticket.watchers?.length && <span className="detail-value">None</span>}
-                </div>
-                {currentUser && (
-                  <button
-                    type="button"
-                    className="btn btn-sm"
-                    onClick={toggleWatcher}
-                  >
-                    {ticket.watchers?.some((w) => w.id === currentUser.id) ? 'Unwatch' : 'Watch'}
-                  </button>
-                )}
-              </div>
-              <div className="detail-field">
-                <div className="detail-field-label">Attachments</div>
-                {ticket.attachments?.length > 0 && (
-                  <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 8px 0' }}>
-                    {ticket.attachments.map((att) => (
-                      <li key={att.id} style={{ marginBottom: '4px' }}>
-                        <a href={att.url} target="_blank" rel="noopener noreferrer" className="label-picker-item">
-                          {att.filename}
-                        </a>
-                        <span className="text-muted" style={{ marginLeft: '4px', fontSize: '0.75em' }}>
-                          ({formatBytes(att.size_bytes)})
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                <input
-                  ref={attachFileRef}
-                  className="hidden"
-                  type="file"
-                  accept="image/png,image/jpeg,image/gif,image/webp"
-                  onChange={handleAttachFile}
-                />
-                <button
-                  type="button"
-                  className="btn btn-sm"
-                  disabled={attachUploading}
-                  onClick={() => attachFileRef.current?.click()}
-                >
-                  {attachUploading ? 'Uploading...' : 'Attach file'}
-                </button>
-              </div>
-              {isEditing && (currentUser?.role === 'admin' || ticket?.creator_id === currentUser?.id) && (
-                <button type="button" className="btn btn-danger btn-sm" onClick={deleteTicket}>Delete ticket</button>
-              )}
-            </aside>
-          </div>
+            </div>
+
+            {(currentUser?.role === 'admin' || ticket?.creator_id === currentUser?.id) && (
+              <Button type="button" variant="destructive" size="sm" onClick={deleteTicket}>
+                <TrashIcon weight="bold" />
+                Delete ticket
+              </Button>
+            )}
+          </aside>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

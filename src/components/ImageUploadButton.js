@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { uploadImageFile } from '@/lib/upload-image';
+import { Button } from '@/components/ui/button';
 
 export default function ImageUploadButton({ onUploaded }) {
   const inputRef = useRef(null);
@@ -31,14 +32,15 @@ export default function ImageUploadButton({ onUploaded }) {
         accept="image/png,image/jpeg,image/gif,image/webp"
         onChange={handleChange}
       />
-      <button
+      <Button
         type="button"
-        className="btn btn-sm"
+        size="sm"
+        variant="outline"
         disabled={uploading}
         onClick={() => inputRef.current?.click()}
       >
         {uploading ? 'Uploading...' : 'Upload image'}
-      </button>
+      </Button>
     </>
   );
 }

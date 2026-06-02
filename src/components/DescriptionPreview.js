@@ -25,15 +25,18 @@ function renderInline(text) {
   });
 }
 
-export default function DescriptionPreview({ value }) {
+export default function DescriptionPreview({ value, className = '' }) {
   const lines = value.split('\n');
-  const hasContent = lines.some((line) => line.trim());
+  const visibleLines = lines.filter((line) => !line.trim().startsWith('<!--'));
+  const hasContent = visibleLines.some((line) => line.trim());
 
-  if (!hasContent) return null;
+  if (!hasContent) {
+    return <div className={`description-preview description-preview-empty ${className}`.trim()}>Nothing to preview yet.</div>;
+  }
 
   return (
-    <div className="description-preview">
-      {lines.map((line, index) => {
+    <div className={`description-preview ${className}`.trim()}>
+      {visibleLines.map((line, index) => {
         const trimmed = line.trim();
         const image = trimmed.match(IMAGE_PATTERN);
         if (image) {

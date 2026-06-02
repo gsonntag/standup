@@ -3,6 +3,9 @@
 import { useRef, useState } from 'react';
 import { apiFetch } from '@/lib/client-api';
 import { timeAgo } from '@/lib/dates';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { PaperPlaneRightIcon, TrashIcon } from '@phosphor-icons/react';
 
 function renderCommentContent(content, users) {
   const usernames = new Set((users || []).map((u) => u.username));
@@ -131,14 +134,17 @@ export default function CommentThread({ ticketId, comments, onAdded, currentUser
               <span className="comment-author">{comment.author_username}</span>
               <span className="comment-date">{timeAgo(comment.created_at)}</span>
               {canDelete && (
-                <button
+                <Button
                   type="button"
-                  className="dep-remove"
+                  size="xs"
+                  variant="ghost"
+                  className="comment-delete-button"
                   onClick={() => handleDelete(comment.id)}
                   title="Delete comment"
                 >
-                  delete
-                </button>
+                  <TrashIcon weight="bold" />
+                  Delete
+                </Button>
               )}
             </div>
             <div className="comment-body">
@@ -159,13 +165,14 @@ export default function CommentThread({ ticketId, comments, onAdded, currentUser
         );
       })}
       <form className="comment-form" onSubmit={handleSubmit}>
-        <div style={{ position: 'relative' }}>
-          <textarea
+        <div className="comment-composer">
+          <Textarea
             ref={textareaRef}
             value={content}
             onChange={handleContentChange}
             onKeyDown={handleKeyDown}
-            placeholder="Add a comment"
+            placeholder="Add a comment. Use @username to mention teammates."
+            className="comment-textarea"
           />
           {mentionQuery !== null && mentionUsers.length > 0 && (
             <div className="mention-dropdown">
@@ -181,9 +188,10 @@ export default function CommentThread({ ticketId, comments, onAdded, currentUser
             </div>
           )}
         </div>
-        <button type="submit" className="btn btn-primary btn-sm" disabled={loading}>
+        <Button type="submit" size="sm" className="tickets-new-button comment-submit-button" disabled={loading || !content.trim()}>
+          <PaperPlaneRightIcon weight="bold" />
           {loading ? 'Adding...' : 'Add comment'}
-        </button>
+        </Button>
       </form>
     </>
   );

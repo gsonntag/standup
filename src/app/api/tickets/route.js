@@ -2,10 +2,11 @@ import { NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import { jsonError, withAuth } from '@/lib/api';
 import { getDb } from '@/lib/db';
-import { PRIORITIES } from '@/lib/constants';
+import { PRIORITIES, STATUSES } from '@/lib/constants';
 import { notifyTicketCreated } from '@/lib/discord';
 
 const PRIORITY_VALUES = new Set(PRIORITIES.map((p) => p.value));
+const STATUS_VALUES = new Set(STATUSES.map((s) => s.value));
 
 function parsePositiveInteger(value, field) {
   if (value === null || value === undefined || value === '') return null;
@@ -23,6 +24,11 @@ function parseNonNegativeInteger(value, field) {
     return { error: `${field} must be zero or a positive integer.` };
   }
   return parsed;
+}
+
+function normalizeIdList(value) {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.filter(Boolean).map((item) => String(item)))];
 }
 
 export function attachLabels(db, tickets) {
@@ -186,9 +192,13 @@ export const POST = withAuth(async (request, user) => {
   const body = await request.json();
   const title = body.title?.trim();
   const priority = body.priority || 'medium';
+  const requestedStatus = body.status || null;
   const sprintId = body.sprint_id || null;
   const assigneeId = body.assignee_id || null;
   const githubRepoId = body.github_repo_id || null;
+  const labelIds = normalizeIdList(body.label_ids);
+  const watcherIds = normalizeIdList(body.watcher_ids);
+  const blockerIds = normalizeIdList(body.blocker_ids);
   const totalPoints = parsePositiveInteger(body.total_points ?? body.story_points, 'total_points');
   if (totalPoints?.error) return jsonError(totalPoints.error);
   const pointsRemainingInput = parseNonNegativeInteger(body.points_remaining, 'points_remaining');
@@ -196,14 +206,17 @@ export const POST = withAuth(async (request, user) => {
   if (pointsRemainingInput != null && totalPoints == null) {
     return jsonError('points_remaining requires total_points.');
   }
-  const pointsRemaining = totalPoints == null ? null : pointsRemainingInput ?? totalPoints;
+  let pointsRemaining = totalPoints == null ? null : pointsRemainingInput ?? totalPoints;
   if (pointsRemaining != null && pointsRemaining > totalPoints) {
     return jsonError('points_remaining cannot exceed total_points.');
   }
-  const status = pointsRemaining === 0 ? 'in_review' : 'backlog';
+  let status = requestedStatus || (sprintId ? 'todo' : 'backlog');
 
   if (!title) return jsonError('Title is required.');
   if (!PRIORITY_VALUES.has(priority)) return jsonError('Invalid priority.');
+  if (!STATUS_VALUES.has(status)) return jsonError('Invalid status.');
+  if (status === 'done' && totalPoints != null) pointsRemaining = 0;
+  if (pointsRemaining === 0 && status !== 'done' && status !== 'in_review') status = 'in_review';
   let sprintEndDate = null;
   if (sprintId) {
     const sprint = db.prepare('SELECT end_date FROM sprints WHERE id = ?').get(sprintId);
@@ -216,18 +229,50 @@ export const POST = withAuth(async (request, user) => {
   if (githubRepoId && !db.prepare('SELECT id FROM github_repositories WHERE id = ?').get(githubRepoId)) {
     return jsonError('GitHub repository not found.', 404);
   }
+  for (const labelId of labelIds) {
+    if (!db.prepare('SELECT id FROM labels WHERE id = ?').get(labelId)) {
+      return jsonError('Label not found.', 404);
+    }
+  }
+  for (const watcherId of watcherIds) {
+    if (!db.prepare('SELECT id FROM users WHERE id = ?').get(watcherId)) {
+      return jsonError('Watcher not found.', 404);
+    }
+  }
+  for (const blockerId of blockerIds) {
+    if (!db.prepare('SELECT id FROM tickets WHERE id = ?').get(blockerId)) {
+      return jsonError('Blocker ticket not found.', 404);
+    }
+  }
 
   const dueDate = body.due_date || sprintEndDate;
+  if (dueDate && !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) return jsonError('Invalid due_date format. Use YYYY-MM-DD.');
 
   const id = uuidv4();
   const sortOrder = db.prepare('SELECT COALESCE(MAX(sort_order), 0) + 1 AS next FROM tickets').get().next;
-  db.prepare(`
-    INSERT INTO tickets (
-      id, number, title, description, status, priority, sort_order, sprint_id, assignee_id,
-      creator_id, total_points, points_remaining, github_repo_id, due_date
-    )
-    VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, title, body.description || '', status, priority, sortOrder, sprintId, assigneeId, user.id, totalPoints, pointsRemaining, githubRepoId, dueDate);
+  const createTx = db.transaction(() => {
+    db.prepare(`
+      INSERT INTO tickets (
+        id, number, title, description, status, priority, sort_order, sprint_id, assignee_id,
+        creator_id, total_points, points_remaining, github_repo_id, due_date
+      )
+      VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, title, body.description || '', status, priority, sortOrder, sprintId, assigneeId, user.id, totalPoints, pointsRemaining, githubRepoId, dueDate);
+
+    for (const labelId of labelIds) {
+      db.prepare('INSERT OR IGNORE INTO ticket_labels (ticket_id, label_id) VALUES (?, ?)').run(id, labelId);
+    }
+    for (const watcherId of watcherIds) {
+      db.prepare('INSERT OR IGNORE INTO ticket_watchers (ticket_id, user_id) VALUES (?, ?)').run(id, watcherId);
+    }
+    if (assigneeId) {
+      db.prepare('INSERT OR IGNORE INTO ticket_watchers (ticket_id, user_id) VALUES (?, ?)').run(id, assigneeId);
+    }
+    for (const blockerId of blockerIds) {
+      db.prepare('INSERT OR IGNORE INTO ticket_dependencies (ticket_id, depends_on_id) VALUES (?, ?)').run(id, blockerId);
+    }
+  });
+  createTx();
 
   const created = getTicketById(db, id);
   // Don't ping the creator if they assigned the ticket to themselves.

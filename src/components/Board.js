@@ -6,6 +6,11 @@ import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/client-api';
 import { STATUSES } from '@/lib/constants';
 import { parseTimestamp } from '@/lib/dates';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import BoardColumn from './BoardColumn';
 import TicketCard from './TicketCard';
 import TicketDetail from './TicketDetail';
@@ -32,6 +37,11 @@ export default function Board({ sprintId, currentUser }) {
   }
 
   async function fetchTickets() {
+    if (!sprintId) {
+      setTickets([]);
+      setLoaded(true);
+      return;
+    }
     const res = await apiFetch(`/api/tickets?sprint_id=${sprintId}`);
     const data = await res.json();
     setTickets(data.tickets || []);
@@ -258,47 +268,51 @@ export default function Board({ sprintId, currentUser }) {
     <>
       <div className="board-toolbar" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
         <div className="btn-group">
-          <button type="button" className={`btn btn-sm${view === 'all' ? ' btn-active' : ''}`} onClick={() => setView('all')}>Whole Sprint</button>
-          <button type="button" className={`btn btn-sm${view === 'mine' ? ' btn-active' : ''}`} onClick={() => setView('mine')}>My Tickets</button>
+          <Button type="button" size="sm" variant={view === 'all' ? 'default' : 'outline'} onClick={() => setView('all')}>Whole Sprint</Button>
+          <Button type="button" size="sm" variant={view === 'mine' ? 'default' : 'outline'} onClick={() => setView('mine')}>My Tickets</Button>
         </div>
-        <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-          Swimlanes:&nbsp;
-          <select value={swimlane} onChange={(e) => setSwimlane(e.target.value)} style={{ fontSize: '0.8rem' }}>
-            <option value="none">None</option>
-            <option value="assignee">Assignee</option>
-            <option value="priority">Priority</option>
-          </select>
-        </label>
+        <Select value={swimlane} onValueChange={setSwimlane}>
+          <SelectTrigger className="w-40">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">No swimlanes</SelectItem>
+            <SelectItem value="assignee">Assignee</SelectItem>
+            <SelectItem value="priority">Priority</SelectItem>
+          </SelectContent>
+        </Select>
         {currentUser?.role === 'admin' && sprintId && (
-          <button
+          <Button
             type="button"
-            className="btn btn-sm"
+            size="sm"
+            variant="outline"
             onClick={() => setShowWipSettings((v) => !v)}
             title="WIP Limit Settings"
-            style={{ fontSize: '0.8rem' }}
           >
-            ⚙ WIP Limits
-          </button>
+            WIP limits
+          </Button>
         )}
       </div>
 
       {showWipSettings && (
-        <div className="wip-settings-panel" style={{ background: 'var(--bg-secondary, #f5f5f5)', border: '1px solid var(--border)', borderRadius: '6px', padding: '0.75rem 1rem', marginBottom: '0.75rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-          {STATUSES.map((s) => (
-            <label key={s.value} style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '0.8rem' }}>
-              {s.label}
-              <input
-                type="number"
-                min="0"
-                style={{ width: '60px', padding: '2px 4px', fontSize: '0.8rem' }}
-                value={wipDraft[s.value] || 0}
-                onChange={(e) => setWipDraft((prev) => ({ ...prev, [s.value]: Number(e.target.value) }))}
-              />
-            </label>
-          ))}
-          <button type="button" className="btn btn-sm" onClick={saveWipLimits}>Save</button>
-          <button type="button" className="btn btn-sm" onClick={() => setShowWipSettings(false)}>Cancel</button>
-        </div>
+        <Card className="wip-settings-panel mb-3">
+          <CardContent className="flex flex-wrap items-end gap-4 pt-4">
+            {STATUSES.map((s) => (
+              <div key={s.value} className="grid gap-1">
+                <Label>{s.label}</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  className="w-20"
+                  value={wipDraft[s.value] || 0}
+                  onChange={(e) => setWipDraft((prev) => ({ ...prev, [s.value]: Number(e.target.value) }))}
+                />
+              </div>
+            ))}
+            <Button type="button" size="sm" onClick={saveWipLimits}>Save</Button>
+            <Button type="button" size="sm" variant="outline" onClick={() => setShowWipSettings(false)}>Cancel</Button>
+          </CardContent>
+        </Card>
       )}
 
       <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
@@ -326,7 +340,19 @@ export default function Board({ sprintId, currentUser }) {
           </div>
         ) : (
           <>
-            <div className="board">
+            {loaded && !visibleTickets.length && (
+              <div className="board-empty-banner">
+                <strong>{sprintId ? 'This sprint is ready for tickets.' : 'No active sprint yet.'}</strong>
+                <span>
+                  {view === 'mine'
+                    ? 'No tickets are assigned to you in this view.'
+                    : sprintId
+                      ? 'Move issues from Tickets into this sprint or add them while editing the sprint.'
+                      : 'Start a sprint from the Sprints page to make this board active.'}
+                </span>
+              </div>
+            )}
+            <div className={`board${loaded && !visibleTickets.length ? ' board-empty' : ''}`}>
               {STATUSES.map((status) => (
                 <BoardColumn
                   key={status.value}
@@ -340,13 +366,6 @@ export default function Board({ sprintId, currentUser }) {
                 />
               ))}
             </div>
-            {loaded && !visibleTickets.length && sprintId && (
-              <div className="empty" style={{ gridColumn: '1/-1', padding: '2rem', textAlign: 'center' }}>
-                {view === 'mine'
-                  ? 'No tickets assigned to you in this sprint.'
-                  : 'No tickets in this sprint. Move tickets from the backlog or create new ones.'}
-              </div>
-            )}
           </>
         )}
         <DragOverlay>

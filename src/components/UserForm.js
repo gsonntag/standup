@@ -3,6 +3,11 @@
 import { useState } from 'react';
 import { apiFetch } from '@/lib/client-api';
 import { MAX_USERNAME_LENGTH } from '@/lib/constants';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { CheckCircleIcon, UserCirclePlusIcon } from '@phosphor-icons/react';
+import { AppActions, AppField } from './AppUI';
 
 export default function UserForm({ onCreated, onCancel }) {
   const [username, setUsername] = useState('');
@@ -33,35 +38,39 @@ export default function UserForm({ onCreated, onCancel }) {
 
   if (created) {
     return (
-      <div className="mb-lg">
-        <h3 className="mb-md">User created</h3>
-        <p className="text-sm">
-          Share this temporary password with <span className="font-bold">{created.username}</span>.
-          They&apos;ll be prompted to set a new one when they log in.
-        </p>
-        <p className="mb-lg">
-          Temporary password: <span className="text-mono font-bold" style={{ fontSize: '1.1rem' }}>{created.tempPassword}</span>
-        </p>
-        <button type="button" className="btn btn-primary btn-sm" onClick={onCancel}>Done</button>
-      </div>
+      <Card className="team-form-card ds-card">
+        <CardHeader><span className="ds-section-icon"><CheckCircleIcon weight="bold" /></span><CardTitle>User created</CardTitle></CardHeader>
+        <CardContent className="team-form-content">
+          <p className="text-sm">
+            Share this temporary password with <span className="font-bold">{created.username}</span>.
+            They&apos;ll be prompted to set a new one when they log in.
+          </p>
+          <div className="team-temp-password">
+            <span>Temporary password</span>
+            <strong className="text-mono">{created.tempPassword}</strong>
+          </div>
+          <Button type="button" size="sm" className="tickets-new-button" onClick={onCancel}>Done</Button>
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mb-lg">
-      <h3 className="mb-lg">Add User</h3>
-      <div className="form-row">
-        <div className="form-group">
-          <label htmlFor="new-username">Username</label>
-          <input id="new-username" value={username} onChange={(e) => setUsername(e.target.value)} maxLength={MAX_USERNAME_LENGTH} autoFocus placeholder="lowercase, max 8 chars" />
-        </div>
-      </div>
-      <p className="text-muted text-sm mb-md">A temporary password will be generated automatically.</p>
-      {error && <div className="form-error">{error}</div>}
-      <div className="flex gap-md">
-        <button type="submit" className="btn btn-primary btn-sm" disabled={loading}>{loading ? 'Creating...' : 'Create'}</button>
-        <button type="button" className="btn btn-sm" onClick={onCancel}>Cancel</button>
-      </div>
-    </form>
+    <Card className="team-form-card ds-card">
+      <CardHeader><span className="ds-section-icon"><UserCirclePlusIcon weight="bold" /></span><CardTitle>Add user</CardTitle></CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="team-inline-form">
+          <AppField id="new-username" label="Username" icon={UserCirclePlusIcon}>
+            <Input id="new-username" value={username} onChange={(e) => setUsername(e.target.value)} maxLength={MAX_USERNAME_LENGTH} autoFocus placeholder="lowercase, max 8 chars" />
+          </AppField>
+          <p className="text-muted text-sm">A temporary password will be generated automatically.</p>
+          {error && <div className="form-error">{error}</div>}
+          <AppActions className="team-action-row">
+            <Button type="submit" size="sm" className="tickets-new-button" disabled={loading}><UserCirclePlusIcon weight="bold" />{loading ? 'Creating...' : 'Create'}</Button>
+            <Button type="button" size="sm" variant="outline" onClick={onCancel}>Cancel</Button>
+          </AppActions>
+        </form>
+      </CardContent>
+    </Card>
   );
 }

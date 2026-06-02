@@ -4,6 +4,25 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/client-api';
 import { MIN_PASSWORD_LENGTH } from '@/lib/constants';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  DiscordLogoIcon,
+  GithubLogoIcon,
+  KeyIcon,
+  PencilSimpleIcon,
+  PlusIcon,
+  ShieldCheckIcon,
+  TrashIcon,
+  UserCirclePlusIcon,
+  UsersThreeIcon,
+} from '@phosphor-icons/react';
+import AppPageHeader from './AppPageHeader';
+import { AppActions, AppField } from './AppUI';
 import UserForm from './UserForm';
 
 export default function TeamView({ currentUser }) {
@@ -178,24 +197,20 @@ export default function TeamView({ currentUser }) {
     setRepositories((prev) => prev.filter((existing) => existing.id !== repo.id));
   }
 
-  const colCount = 5;
-
   if (mustChange) {
     return (
       <div className="page">
         <div className="page-header"><h1>Set a new password</h1></div>
         <p className="text-muted mb-lg">You&apos;re using a temporary password. Choose a new one to continue.</p>
-        <form onSubmit={(e) => submitPasswordChange(e, true)} style={{ maxWidth: '320px' }}>
-          <div className="form-group">
-            <label htmlFor="forced-new">New password</label>
-            <input id="forced-new" type="password" value={pwNew} onChange={(e) => setPwNew(e.target.value)} autoComplete="new-password" autoFocus />
-          </div>
-          <div className="form-group">
-            <label htmlFor="forced-confirm">Confirm password</label>
-            <input id="forced-confirm" type="password" value={pwConfirm} onChange={(e) => setPwConfirm(e.target.value)} autoComplete="new-password" />
-          </div>
+        <form onSubmit={(e) => submitPasswordChange(e, true)} className="team-password-card">
+          <AppField id="forced-new" label="New password" icon={KeyIcon}>
+            <Input id="forced-new" type="password" value={pwNew} onChange={(e) => setPwNew(e.target.value)} autoComplete="new-password" autoFocus />
+          </AppField>
+          <AppField id="forced-confirm" label="Confirm password" icon={KeyIcon}>
+            <Input id="forced-confirm" type="password" value={pwConfirm} onChange={(e) => setPwConfirm(e.target.value)} autoComplete="new-password" />
+          </AppField>
           {pwError && <div className="form-error">{pwError}</div>}
-          <button type="submit" className="btn btn-primary" disabled={pwLoading}>{pwLoading ? 'Saving...' : 'Set password'}</button>
+          <Button type="submit" className="tickets-new-button" disabled={pwLoading}>{pwLoading ? 'Saving...' : 'Set password'}</Button>
         </form>
       </div>
     );
@@ -203,10 +218,18 @@ export default function TeamView({ currentUser }) {
 
   return (
     <div className="page">
-      <div className="page-header">
-        <h1>Team</h1>
-        {isAdmin && <button className="btn btn-sm" onClick={() => setShowForm(true)}>+ Add User</button>}
-      </div>
+      <AppPageHeader
+        icon={UsersThreeIcon}
+        eyebrow="Workspace"
+        title="Team"
+        subtitle="Manage LA Hacks tech accounts, Discord pings, and GitHub repositories."
+        actions={isAdmin && (
+          <Button size="sm" className="tickets-new-button" onClick={() => setShowForm(true)}>
+            <UserCirclePlusIcon weight="bold" />
+            Add user
+          </Button>
+        )}
+      />
       {showForm && (
         <UserForm
           onCreated={(newUser) => {
@@ -217,72 +240,80 @@ export default function TeamView({ currentUser }) {
       )}
       {error && <div className="form-error">{error}</div>}
       {resetResult && (
-        <div className="empty" style={{ marginBottom: '1rem', textAlign: 'left' }}>
-          Temporary password for <span className="font-bold">{resetResult.username}</span>:{' '}
-          <span className="text-mono font-bold" style={{ fontSize: '1.1rem' }}>{resetResult.tempPassword}</span>
-          {' '}— they&apos;ll set a new one at next login.
-          <button type="button" className="btn btn-sm" style={{ marginLeft: '0.75rem' }} onClick={() => setResetResult(null)}>Dismiss</button>
-        </div>
+        <Card className="team-notice-card">
+          <CardContent>
+            <span>Temporary password for <strong>{resetResult.username}</strong></span>
+            <strong className="text-mono">{resetResult.tempPassword}</strong>
+            <span>They&apos;ll set a new one at next login.</span>
+            <Button type="button" size="sm" variant="outline" onClick={() => setResetResult(null)}>Dismiss</Button>
+          </CardContent>
+        </Card>
       )}
       {showSelfPwForm && (
-        <form onSubmit={(e) => submitPasswordChange(e, false)} className="mb-lg" style={{ maxWidth: '320px' }}>
-          <h3 className="mb-md">Change your password</h3>
-          <div className="form-group">
-            <label htmlFor="self-current">Current password</label>
-            <input id="self-current" type="password" value={pwCurrent} onChange={(e) => setPwCurrent(e.target.value)} autoComplete="current-password" autoFocus />
-          </div>
-          <div className="form-group">
-            <label htmlFor="self-new">New password</label>
-            <input id="self-new" type="password" value={pwNew} onChange={(e) => setPwNew(e.target.value)} autoComplete="new-password" />
-          </div>
-          <div className="form-group">
-            <label htmlFor="self-confirm">Confirm password</label>
-            <input id="self-confirm" type="password" value={pwConfirm} onChange={(e) => setPwConfirm(e.target.value)} autoComplete="new-password" />
-          </div>
+        <Card className="team-form-card">
+        <CardHeader><CardTitle>Change your password</CardTitle></CardHeader>
+        <CardContent>
+        <form onSubmit={(e) => submitPasswordChange(e, false)} className="team-inline-form">
+          <AppField id="self-current" label="Current password" icon={KeyIcon}>
+            <Input id="self-current" type="password" value={pwCurrent} onChange={(e) => setPwCurrent(e.target.value)} autoComplete="current-password" autoFocus />
+          </AppField>
+          <AppField id="self-new" label="New password" icon={KeyIcon}>
+            <Input id="self-new" type="password" value={pwNew} onChange={(e) => setPwNew(e.target.value)} autoComplete="new-password" />
+          </AppField>
+          <AppField id="self-confirm" label="Confirm password" icon={KeyIcon}>
+            <Input id="self-confirm" type="password" value={pwConfirm} onChange={(e) => setPwConfirm(e.target.value)} autoComplete="new-password" />
+          </AppField>
           {pwError && <div className="form-error">{pwError}</div>}
-          <div className="flex gap-md">
-            <button type="submit" className="btn btn-primary btn-sm" disabled={pwLoading}>{pwLoading ? 'Saving...' : 'Save'}</button>
-            <button type="button" className="btn btn-sm" onClick={() => { setShowSelfPwForm(false); setPwError(''); setPwCurrent(''); setPwNew(''); setPwConfirm(''); }}>Cancel</button>
-          </div>
+          <AppActions className="team-action-row">
+            <Button type="submit" size="sm" className="tickets-new-button" disabled={pwLoading}>{pwLoading ? 'Saving...' : 'Save'}</Button>
+            <Button type="button" size="sm" variant="outline" onClick={() => { setShowSelfPwForm(false); setPwError(''); setPwCurrent(''); setPwNew(''); setPwConfirm(''); }}>Cancel</Button>
+          </AppActions>
         </form>
+        </CardContent>
+        </Card>
       )}
-      <div className="table-container">
-        <table>
-          <thead>
-            <tr>
-              <th>Username</th>
-              <th>Role</th>
-              <th>Discord</th>
-              <th>Joined</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
+      <Card className="team-table-card ds-card">
+        <CardHeader>
+          <span className="ds-section-icon"><UsersThreeIcon weight="bold" /></span>
+          <CardTitle>Members</CardTitle>
+        </CardHeader>
+        <CardContent>
+        <Table className="team-table">
+          <TableHeader>
+            <TableRow>
+              <TableHead>Username</TableHead>
+              <TableHead>Role</TableHead>
+              <TableHead>Discord</TableHead>
+              <TableHead>Joined</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {users.map((user) => {
               const canEditDiscord = isAdmin || user.id === currentUser?.id;
               return (
-                <tr key={user.id}>
-                  <td className="font-bold">{user.username}</td>
-                  <td className="text-muted">
+                <TableRow key={user.id}>
+                  <TableCell className="font-bold">
+                    <span className="ds-person-cell"><span className="ds-avatar">{user.username.slice(0, 2)}</span>{user.username}</span>
+                  </TableCell>
+                  <TableCell>
                     {isAdmin && user.id !== currentUser?.id ? (
-                      <select
-                        className="role-select"
-                        value={user.role}
-                        disabled={updatingUserId === user.id}
-                        onChange={(e) => updateRole(user.id, e.target.value)}
-                      >
-                        <option value="member">member</option>
-                        <option value="admin">admin</option>
-                      </select>
+                      <Select value={user.role} disabled={updatingUserId === user.id} onValueChange={(role) => updateRole(user.id, role)}>
+                        <SelectTrigger className="team-role-select"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="member">member</SelectItem>
+                          <SelectItem value="admin">admin</SelectItem>
+                        </SelectContent>
+                      </Select>
                     ) : (
-                      user.role
+                      <Badge className="ds-role-badge" variant="outline"><ShieldCheckIcon weight="bold" />{user.role}</Badge>
                     )}
-                  </td>
-                  <td>
+                  </TableCell>
+                  <TableCell>
                     {editingDiscord === user.id ? (
-                      <span className="flex gap-sm" style={{ alignItems: 'center' }}>
-                        <input
-                          style={{ width: '220px' }}
+                      <span className="team-inline-edit">
+                        <Input
+                          className="team-discord-input"
                           value={discordInput}
                           onChange={(e) => setDiscordInput(e.target.value)}
                           onKeyDown={(e) => {
@@ -293,123 +324,141 @@ export default function TeamView({ currentUser }) {
                           placeholder="user ID (e.g. 204255221017214977)"
                           title="Numeric Discord user ID — required for @-mention pings. In Discord: User Settings → Advanced → Developer Mode, then right-click a user → Copy User ID."
                         />
-                        <button type="button" className="btn btn-sm btn-primary" onClick={() => saveDiscord(user.id)}>Save</button>
-                        <button type="button" className="btn btn-sm" onClick={() => setEditingDiscord(null)}>Cancel</button>
+                        <Button type="button" size="sm" className="tickets-new-button" onClick={() => saveDiscord(user.id)}>Save</Button>
+                        <Button type="button" size="sm" variant="outline" onClick={() => setEditingDiscord(null)}>Cancel</Button>
                       </span>
                     ) : (
-                      <span className="flex gap-sm" style={{ alignItems: 'center' }}>
-                        <span className="text-muted text-sm">{user.discord_id || <em>not set</em>}</span>
+                      <span className="team-inline-edit">
+                        <span className="team-discord-value"><DiscordLogoIcon weight="bold" />{user.discord_id || <em>not set</em>}</span>
                         {canEditDiscord && (
-                          <button type="button" className="btn btn-sm" onClick={() => startEditDiscord(user)}>
+                          <Button type="button" size="sm" variant="outline" onClick={() => startEditDiscord(user)}>
+                            <PencilSimpleIcon weight="bold" />
                             {user.discord_id ? 'Edit' : 'Set'}
-                          </button>
+                          </Button>
                         )}
                       </span>
                     )}
-                  </td>
-                  <td className="text-muted text-sm">{user.created_at?.split(' ')[0]?.split('T')[0]}</td>
-                  <td>
-                    <span className="flex gap-sm">
+                  </TableCell>
+                  <TableCell className="text-muted text-sm">{user.created_at?.split(' ')[0]?.split('T')[0]}</TableCell>
+                  <TableCell>
+                    <span className="team-action-row">
                       {user.id === currentUser?.id && (
-                        <button
+                        <Button
                           type="button"
-                          className="btn btn-sm"
+                          size="sm"
+                          variant="outline"
                           onClick={() => { setShowSelfPwForm(true); setPwError(''); }}
                         >
+                          <KeyIcon weight="bold" />
                           Change password
-                        </button>
+                        </Button>
                       )}
                       {isAdmin && user.id !== currentUser?.id && (
                         <>
-                          <button
+                          <Button
                             type="button"
-                            className="btn btn-sm"
+                            size="sm"
+                            variant="outline"
                             disabled={updatingUserId === user.id}
                             onClick={() => resetPassword(user)}
                           >
+                            <KeyIcon weight="bold" />
                             Reset password
-                          </button>
-                          <button
+                          </Button>
+                          <Button
                             type="button"
-                            className="btn btn-danger btn-sm"
+                            size="sm"
+                            variant="destructive"
                             disabled={updatingUserId === user.id}
                             onClick={() => deleteUser(user)}
                           >
+                            <TrashIcon weight="bold" />
                             Delete
-                          </button>
+                          </Button>
                         </>
                       )}
                     </span>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               );
             })}
-            {!users.length && <tr><td colSpan={colCount}><div className="empty">No users</div></td></tr>}
-          </tbody>
-        </table>
-      </div>
+            {!users.length && <TableRow><TableCell colSpan={5}><div className="empty">No users</div></TableCell></TableRow>}
+          </TableBody>
+        </Table>
+        </CardContent>
+      </Card>
       {users.length <= 1 && (
-        <div className="empty" style={{ marginTop: '1rem' }}>
+        <div className="empty team-empty-note">
           {isAdmin
             ? "You're the only user here. Add team members with + Add User above."
             : "You're the only user here. Ask an admin to add team members."}
         </div>
       )}
-      <div className="page-header mt-xl">
-        <h2>GitHub Repositories</h2>
-      </div>
+      <AppPageHeader
+        className="team-section-header"
+        icon={GithubLogoIcon}
+        eyebrow="Integrations"
+        title="GitHub Repositories"
+        subtitle="Repositories available for ticket linking and commit activity."
+      />
       {isAdmin && (
-        <form onSubmit={addRepository} className="form-row mb-lg">
-          <div className="form-group" style={{ maxWidth: '320px' }}>
-            <label htmlFor="github-repository">Repository</label>
-            <input
+        <Card className="team-form-card ds-card">
+          <CardContent>
+          <form onSubmit={addRepository} className="team-repo-form">
+          <AppField id="github-repository" label="Repository" icon={GithubLogoIcon}>
+            <Input
               id="github-repository"
               value={repoInput}
               onChange={(e) => setRepoInput(e.target.value)}
               placeholder="owner/name"
               required
             />
-          </div>
-          <div className="form-group" style={{ alignSelf: 'flex-end' }}>
-            <button type="submit" className="btn btn-sm" disabled={repoLoading}>
-              {repoLoading ? 'Adding...' : '+ Add Repository'}
-            </button>
-          </div>
+          </AppField>
+          <AppActions className="team-repo-submit">
+            <Button type="submit" size="sm" className="tickets-new-button" disabled={repoLoading}>
+              <PlusIcon weight="bold" />
+              {repoLoading ? 'Adding...' : 'Add repository'}
+            </Button>
+          </AppActions>
         </form>
+          </CardContent>
+        </Card>
       )}
-      <div className="table-container">
-        <table>
-          <thead>
-            <tr>
-              <th>Repository</th>
-              <th>Default Branch</th>
-              <th>Updated</th>
-              {isAdmin && <th>Actions</th>}
-            </tr>
-          </thead>
-          <tbody>
+      <Card className="team-table-card ds-card">
+        <CardContent>
+        <Table className="team-table">
+          <TableHeader>
+            <TableRow>
+              <TableHead>Repository</TableHead>
+              <TableHead>Default Branch</TableHead>
+              <TableHead>Updated</TableHead>
+              {isAdmin && <TableHead>Actions</TableHead>}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {repositories.map((repo) => (
-              <tr key={repo.id}>
-                <td className="font-bold">
-                  <a href={repo.html_url} target="_blank" rel="noopener noreferrer">{repo.full_name}</a>
-                </td>
-                <td className="text-muted text-mono">{repo.default_branch}</td>
-                <td className="text-muted text-sm">{repo.updated_at?.split(' ')[0]?.split('T')[0]}</td>
+              <TableRow key={repo.id}>
+                <TableCell className="font-bold">
+                  <a className="team-repo-link" href={repo.html_url} target="_blank" rel="noopener noreferrer"><GithubLogoIcon weight="bold" />{repo.full_name}</a>
+                </TableCell>
+                <TableCell className="text-muted text-mono">{repo.default_branch}</TableCell>
+                <TableCell className="text-muted text-sm">{repo.updated_at?.split(' ')[0]?.split('T')[0]}</TableCell>
                 {isAdmin && (
-                  <td>
-                    <button type="button" className="btn btn-danger btn-sm" onClick={() => deleteRepository(repo)}>
+                  <TableCell>
+                    <Button type="button" variant="destructive" size="sm" onClick={() => deleteRepository(repo)}>
                       Remove
-                    </button>
-                  </td>
+                    </Button>
+                  </TableCell>
                 )}
-              </tr>
+              </TableRow>
             ))}
             {!repositories.length && (
-              <tr><td colSpan={isAdmin ? 4 : 3}><div className="empty">No repositories</div></td></tr>
+              <TableRow><TableCell colSpan={isAdmin ? 4 : 3}><div className="empty">No repositories</div></TableCell></TableRow>
             )}
-          </tbody>
-        </table>
-      </div>
+          </TableBody>
+        </Table>
+        </CardContent>
+      </Card>
     </div>
   );
 }

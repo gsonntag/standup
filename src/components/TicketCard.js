@@ -3,6 +3,10 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { isOverdue, daysUntil } from '@/lib/dates';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function TicketCard({ ticket, users, onAssign, onView }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: ticket.id });
@@ -15,48 +19,49 @@ export default function TicketCard({ ticket, users, onAssign, onView }) {
     action();
   }
 
-  function handleAssign(e) {
-    e.stopPropagation();
-    onAssign(e.target.value);
-  }
-
   return (
-    <div
+    <Card
       ref={setNodeRef}
       style={style}
       className={`ticket-card ${isDragging ? 'dragging' : ''}`}
       {...attributes}
       {...listeners}
     >
-      <div className="ticket-card-header">
+      <CardHeader className="ticket-card-header">
         <div className="ticket-card-number">#{ticket.number}</div>
         <div className="ticket-card-actions">
-          <button
+          <Button
             type="button"
-            className="btn btn-sm"
+            size="sm"
+            variant="outline"
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => handleAction(e, onView)}
           >
             View
-          </button>
-          <select
-            className="ticket-card-assignee-select"
-            value={ticket.assignee_id || ''}
+          </Button>
+          <Select
+            value={ticket.assignee_id || 'unassigned'}
             onPointerDown={(e) => e.stopPropagation()}
-            onMouseDown={(e) => e.stopPropagation()}
-            onClick={(e) => e.stopPropagation()}
-            onChange={handleAssign}
+            onValueChange={(value) => onAssign(value === 'unassigned' ? '' : value)}
           >
-            <option value="">Unassigned</option>
+            <SelectTrigger className="ticket-card-assignee-select">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+            <SelectItem value="unassigned">Unassigned</SelectItem>
             {users.map((user) => (
-              <option key={user.id} value={user.id}>{user.username}</option>
+              <SelectItem key={user.id} value={user.id}>{user.username}</SelectItem>
             ))}
-          </select>
+            </SelectContent>
+          </Select>
         </div>
-      </div>
+      </CardHeader>
+      <CardContent>
       <div className="ticket-card-title">{ticket.title}</div>
       <div className="ticket-card-meta">
-        <span className={`priority priority-${ticket.priority}`}>{ticket.priority}</span>
+        <Badge className={`priority-badge priority-badge-${ticket.priority}`} variant="outline">
+          {ticket.priority}
+        </Badge>
         <span className="label-list">
           {ticket.labels?.map((label) => (
             <span key={label.id} className="label" style={{ backgroundColor: label.color }}>
@@ -74,11 +79,11 @@ export default function TicketCard({ ticket, users, onAssign, onView }) {
           }
           return null;
         })()}
-        {hasUnresolvedBlockers && <span className="ticket-card-blocked">BLOCKED</span>}
+        {hasUnresolvedBlockers && <Badge variant="destructive">Blocked</Badge>}
         {ticket.total_points != null && (
-          <span className="ticket-card-points" title="Points remaining">
+          <Badge variant="secondary" title="Points remaining">
             {ticket.points_remaining ?? ticket.total_points} pt. left
-          </span>
+          </Badge>
         )}
         {ticket.assignee_username && (
           <span className="ticket-card-assignee" title={ticket.assignee_username}>
@@ -86,6 +91,7 @@ export default function TicketCard({ ticket, users, onAssign, onView }) {
           </span>
         )}
       </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }
