@@ -301,6 +301,13 @@ db.exec(`
   );
 `);
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS discord_ping_log (
+    discord_id     TEXT PRIMARY KEY,
+    last_pinged_at INTEGER NOT NULL
+  );
+`);
+
 const githubTicketColumns = db.prepare('PRAGMA table_info(tickets)').all().map(c => c.name);
 if (!githubTicketColumns.includes('github_repo_id')) {
   db.exec('ALTER TABLE tickets ADD COLUMN github_repo_id TEXT REFERENCES github_repositories(id) ON DELETE SET NULL');

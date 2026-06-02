@@ -12,6 +12,34 @@ function mentionPrefix(discordIds = []) {
   return unique.length ? unique.map((id) => `<@${id}>`).join(' ') + ' ' : '';
 }
 
+const PING_DEBOUNCE_MS = 10 * 60 * 1000;
+
+/**
+ * Decide who actually gets @mentioned. `importantIds` (review requests, direct
+ * @mentions, new assignments, due reminders) always ping. `pingIds` only ping
+ * if they haven't been pinged in the last 10 minutes — otherwise the embed
+ * still posts, just without their mention. Records the ping time for everyone
+ * we do ping so the window slides forward.
+ */
+function resolvePings({ pingIds = [], importantIds = [] }) {
+  const important = [...new Set(importantIds.filter(Boolean))];
+  const debounced = [...new Set(pingIds.filter(Boolean))].filter((id) => !important.includes(id));
+  const db = getDb();
+  const now = Date.now();
+  const allowed = new Set(important);
+  const last = db.prepare('SELECT last_pinged_at FROM discord_ping_log WHERE discord_id = ?');
+  for (const id of debounced) {
+    const row = last.get(id);
+    if (!row || now - row.last_pinged_at >= PING_DEBOUNCE_MS) allowed.add(id);
+  }
+  const record = db.prepare(`
+    INSERT INTO discord_ping_log (discord_id, last_pinged_at) VALUES (?, ?)
+    ON CONFLICT(discord_id) DO UPDATE SET last_pinged_at = excluded.last_pinged_at
+  `);
+  for (const id of allowed) record.run(id, now);
+  return [...allowed];
+}
+
 /**
  * Discord IDs of the people who care about a ticket — its assignee and watchers,
  * optionally the users @mentioned in a given comment — minus the actor who
@@ -48,9 +76,16 @@ export function ticketStakeholderDiscordIds(ticketId, { excludeUserId = null, me
  * Fire-and-forget post to a Discord channel webhook. Never throws: notification
  * delivery must not break the request that triggered it. Returns true on a 2xx.
  */
-export async function notifyDiscord({ content, embeds } = {}) {
+export async function notifyDiscord({ content, embeds, pingIds, importantIds } = {}) {
   if (!WEBHOOK_URL) return false;
-  if (!content && !embeds?.length) return false;
+
+  // When the caller passes ping targets, resolve them through the debounce and
+  // build the mention string ourselves; otherwise use the literal content.
+  let mentionContent = content;
+  if (pingIds !== undefined || importantIds !== undefined) {
+    mentionContent = mentionPrefix(resolvePings({ pingIds, importantIds }));
+  }
+  if (!mentionContent && !embeds?.length) return false;
 
   // Append a visible "View ticket" link to any embed that carries a ticket URL.
   const withLinks = embeds?.map((embed) => {
@@ -70,7 +105,7 @@ export async function notifyDiscord({ content, embeds } = {}) {
         username: USERNAME,
         avatar_url: AVATAR_URL,
         allowed_mentions: { parse: ['users'] },
-        content,
+        content: mentionContent,
         embeds: withLinks,
       }),
     });
@@ -94,7 +129,7 @@ export function notifyTicketCreated(ticket, { creatorName, assigneeDiscordId, as
   const ids = assigneeDiscordIds || (assigneeDiscordId ? [assigneeDiscordId] : []);
   const mention = ids.length ? ` · assigned to ${ids.map((id) => `<@${id}>`).join(', ')}` : '';
   return notifyDiscord({
-    content: mentionPrefix(ids),
+    importantIds: ids,
     embeds: [{
       title: `🆕 #${ticket.number} ${ticket.title}`,
       url: ticketUrl(ticket.id),
@@ -119,7 +154,7 @@ export function notifyTicketAssigned(ticket, { actorName, assigneeDiscordId, ass
   const due = dueKind ? dueEmbed(ticket, dueKind) : null;
   if (due) embeds.push(due);
   return notifyDiscord({
-    content: mentionPrefix([assigneeDiscordId]),
+    importantIds: [assigneeDiscordId],
     embeds,
   });
 }
@@ -128,7 +163,7 @@ export function notifyTicketUnassigned(ticket, { actorName, oldAssigneeDiscordId
   if (!oldAssigneeDiscordId) return false;
   const destination = newAssigneeName ? `reassigned to ${newAssigneeName}` : 'unassigned from you';
   return notifyDiscord({
-    content: mentionPrefix([oldAssigneeDiscordId]),
+    pingIds: [oldAssigneeDiscordId],
     embeds: [{
       title: `🔄 #${ticket.number} ${ticket.title}`,
       url: ticketUrl(ticket.id),
@@ -141,7 +176,7 @@ export function notifyTicketUnassigned(ticket, { actorName, oldAssigneeDiscordId
 export function notifyReviewRequested(ticket, { actorName, reviewerDiscordIds = [] } = {}) {
   if (!reviewerDiscordIds.length) return false;
   return notifyDiscord({
-    content: mentionPrefix(reviewerDiscordIds),
+    importantIds: reviewerDiscordIds,
     embeds: [{
       title: `Review requested on #${ticket.number}`,
       url: ticketUrl(ticket.id),
@@ -151,9 +186,10 @@ export function notifyReviewRequested(ticket, { actorName, reviewerDiscordIds = 
   });
 }
 
-export function notifyComment(ticket, { actorName, body, pingDiscordIds = [] } = {}) {
+export function notifyComment(ticket, { actorName, body, pingDiscordIds = [], mentionDiscordIds = [] } = {}) {
   return notifyDiscord({
-    content: mentionPrefix(pingDiscordIds),
+    pingIds: pingDiscordIds,
+    importantIds: mentionDiscordIds,
     embeds: [{
       title: `💬 #${ticket.number} ${ticket.title}`,
       url: ticketUrl(ticket.id),
@@ -167,7 +203,7 @@ export function notifyStatusChanged(ticket, { actorName, oldStatus, newStatus, p
   const from = STATUS_LABELS[oldStatus] || oldStatus;
   const to = STATUS_LABELS[newStatus] || newStatus;
   return notifyDiscord({
-    content: mentionPrefix(pingDiscordIds),
+    pingIds: pingDiscordIds,
     embeds: [{
       title: `📋 #${ticket.number} ${ticket.title}`,
       url: ticketUrl(ticket.id),
@@ -180,7 +216,7 @@ export function notifyStatusChanged(ticket, { actorName, oldStatus, newStatus, p
 export function notifyBlockerResolved(ticket, { resolvedBlocker, pingDiscordIds = [] } = {}) {
   const blockerRef = resolvedBlocker ? `#${resolvedBlocker.number} ${resolvedBlocker.title}` : 'its last blocker';
   return notifyDiscord({
-    content: mentionPrefix(pingDiscordIds),
+    pingIds: pingDiscordIds,
     embeds: [{
       title: `✅ #${ticket.number} ${ticket.title} is unblocked`,
       url: ticketUrl(ticket.id),
@@ -212,7 +248,7 @@ export function notifyDueReminder(ticket, { kind, assigneeDiscordId } = {}) {
   if (!embed) return false;
   const ids = Array.isArray(assigneeDiscordId) ? assigneeDiscordId : [assigneeDiscordId];
   return notifyDiscord({
-    content: mentionPrefix(ids),
+    importantIds: ids,
     embeds: [embed],
   });
 }
