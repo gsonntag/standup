@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { apiFetch } from '@/lib/client-api';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -244,7 +244,14 @@ function BurnupChart({ data }) {
         <path d={idealPath} className="chart-line-ideal" />
 
         {/* Actual Area */}
-        {actualAreaPath && <path d={actualAreaPath} className="chart-area-actual" />}
+        {actualAreaPath && (
+          <path
+            d={actualAreaPath}
+            className="chart-area-actual"
+            fill="url(#burnup-actual-grad)"
+            pointerEvents="none"
+          />
+        )}
 
         {/* Actual Line */}
         {actualPath && <path d={actualPath} className="chart-line-actual" />}
@@ -269,7 +276,7 @@ function BurnupChart({ data }) {
 
       {hoveredPoint && (
         <div
-          className="chart-tooltip absolute"
+          className="chart-tooltip absolute bg-popover text-popover-foreground border border-border shadow-xl rounded-lg p-3 w-48 text-xs pointer-events-none transition-all duration-150"
           style={{
             left: `${(hoveredPoint.x / chartWidth) * 100}%`,
             top: `${(hoveredPoint.y / chartHeight) * 100 - 15}%`,
@@ -277,18 +284,18 @@ function BurnupChart({ data }) {
             zIndex: 10,
           }}
         >
-          <div className="font-bold border-b border-white/5 pb-1 mb-1">{formatDashboardDate(hoveredPoint.date)}</div>
-          <div className="flex gap-4 justify-between">
-            <span className="text-muted">Total Scope:</span>
-            <strong>{hoveredPoint.scope} pts</strong>
+          <div className="font-bold border-b border-border/40 pb-1 mb-1">{formatDashboardDate(hoveredPoint.date)}</div>
+          <div className="flex gap-4 justify-between leading-normal py-0.5">
+            <span className="text-muted-foreground">Total Scope:</span>
+            <strong className="text-foreground">{hoveredPoint.scope} pts</strong>
           </div>
-          <div className="flex gap-4 justify-between">
-            <span className="text-muted">Ideal Burnup:</span>
-            <strong>{hoveredPoint.ideal} pts</strong>
+          <div className="flex gap-4 justify-between leading-normal py-0.5">
+            <span className="text-muted-foreground">Ideal Burnup:</span>
+            <strong className="text-foreground">{hoveredPoint.ideal} pts</strong>
           </div>
-          <div className="flex gap-4 justify-between">
-            <span className="text-muted text-indigo-300">Actual Done:</span>
-            <strong className="text-indigo-400">{hoveredPoint.actual} pts</strong>
+          <div className="flex gap-4 justify-between leading-normal py-0.5">
+            <span className="text-indigo-400 font-medium">Actual Done:</span>
+            <strong className="text-indigo-500 font-bold">{hoveredPoint.actual} pts</strong>
           </div>
         </div>
       )}
@@ -299,7 +306,7 @@ function BurnupChart({ data }) {
           <span>Total Scope ({data[N - 1]?.scope || 0} pts)</span>
         </div>
         <div className="legend-item">
-          <span className="legend-color" style={{ border: '1px dashed rgba(255,255,255,0.4)', background: 'transparent', height: '2px', width: '12px' }} />
+          <span className="legend-color" style={{ border: '1px dashed currentColor', opacity: 0.4, background: 'transparent', height: '2px', width: '12px' }} />
           <span>Ideal Path</span>
         </div>
         <div className="legend-item">
@@ -357,10 +364,10 @@ function StatusBreakdown({ summary }) {
 
 function renderActivityMessage(item, onTicketClick) {
   const actor = <strong>@{item.actor_username}</strong>;
-  const ticketRef = <span className="text-mono text-white/50">#{item.ticket_number}</span>;
+  const ticketRef = <span className="text-mono text-foreground/50">#{item.ticket_number}</span>;
   const ticketLink = (
     <strong
-      className="text-white hover:underline cursor-pointer"
+      className="text-foreground hover:text-primary hover:underline cursor-pointer transition-colors"
       onClick={() => onTicketClick(item.ticket_id)}
     >
       {item.ticket_title}
@@ -465,8 +472,11 @@ export default function DashboardView() {
   const [activeTicketId, setActiveTicketId] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchDashboardData = () => {
-    const query = sprintId ? `?sprint_id=${sprintId}` : '';
+  const prevSprintIdRef = useRef('');
+  const isFirstFetchRef = useRef(true);
+
+  const fetchDashboardData = (targetSprintId) => {
+    const query = targetSprintId ? `?sprint_id=${targetSprintId}` : '';
     apiFetch(`/api/dashboard${query}`)
       .then((r) => r.json())
       .then((d) => {
@@ -480,7 +490,8 @@ export default function DashboardView() {
         setSummary(d.summary || null);
         setBurnupChart(d.burnup_chart || []);
         setRecentActivity(d.recent_activity || []);
-        if (d.sprint?.id && !sprintId) {
+        if (d.sprint?.id && !targetSprintId) {
+          prevSprintIdRef.current = d.sprint.id;
           setSprintId(d.sprint.id);
         }
         setLoading(false);
@@ -488,12 +499,22 @@ export default function DashboardView() {
   };
 
   useEffect(() => {
-    fetchDashboardData();
+    if (isFirstFetchRef.current) {
+      isFirstFetchRef.current = false;
+      prevSprintIdRef.current = sprintId;
+      fetchDashboardData(sprintId);
+      return;
+    }
+    if (sprintId === prevSprintIdRef.current) {
+      return;
+    }
+    prevSprintIdRef.current = sprintId;
+    fetchDashboardData(sprintId);
   }, [sprintId]);
 
   useRealtime((event) => {
     if (['ticket', 'comment', 'sprint'].includes(event.kind)) {
-      fetchDashboardData();
+      fetchDashboardData(sprintId);
     }
   });
 
@@ -515,11 +536,19 @@ export default function DashboardView() {
   const overdueCount = summary?.overdue || 0;
   const unassignedCount = summary?.unassigned || 0;
   
-  let healthScore = Math.max(0, 100 - (100 - completion) * 0.6);
+  let healthScore = 100;
+  if (totals.total_points > 0) {
+    healthScore = Math.max(0, 100 - (100 - completion) * 0.6);
+  } else if (summary && summary.total_tickets > 0) {
+    const ticketCompletion = Math.round((summary.done / summary.total_tickets) * 100);
+    healthScore = Math.max(0, 100 - (100 - ticketCompletion) * 0.6);
+  } else {
+    healthScore = 100;
+  }
   healthScore -= Math.min(20, blockedCount * 10);
   healthScore -= Math.min(20, overdueCount * 5);
   healthScore -= Math.min(10, unassignedCount * 3);
-  healthScore = Math.round(healthScore);
+  healthScore = Math.round(Math.max(0, healthScore));
 
   const summaryCards = [
     { label: 'Prod Done', value: totals.done, icon: CheckCircleIcon, tone: 'green' },
@@ -670,10 +699,10 @@ export default function DashboardView() {
                   <CardContent className="space-y-4">
                     <div className="flex items-end justify-between">
                       <div>
-                        <span className="text-3xl font-extrabold text-white">{completion}%</span>
-                        <span className="text-xs text-muted block mt-1">Points complete</span>
+                        <span className="text-3xl font-extrabold text-foreground">{completion}%</span>
+                        <span className="text-xs text-muted-foreground block mt-1">Points complete</span>
                       </div>
-                      <span className="text-sm text-muted">
+                      <span className="text-sm text-muted-foreground">
                         {totals.points_done} of {totals.total_points} story points
                       </span>
                     </div>
@@ -692,29 +721,29 @@ export default function DashboardView() {
                     <CardTitle>Priority Distribution</CardTitle>
                   </CardHeader>
                   <CardContent className="grid grid-cols-2 gap-x-4 gap-y-3">
-                    <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                    <div className="flex items-center justify-between border-b border-border/60 pb-2">
                       <span className="flex items-center gap-2 text-xs text-red-400">
                         <FireIcon weight="fill" /> Urgent
                       </span>
-                      <strong className="text-sm">{summary?.priority_urgent || 0}</strong>
+                      <strong className="text-sm text-foreground">{summary?.priority_urgent || 0}</strong>
                     </div>
-                    <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                    <div className="flex items-center justify-between border-b border-border/60 pb-2">
                       <span className="flex items-center gap-2 text-xs text-amber-500">
                         <ArrowUpIcon weight="bold" /> High
                       </span>
-                      <strong className="text-sm">{summary?.priority_high || 0}</strong>
+                      <strong className="text-sm text-foreground">{summary?.priority_high || 0}</strong>
                     </div>
-                    <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                    <div className="flex items-center justify-between border-b border-border/60 pb-2">
                       <span className="flex items-center gap-2 text-xs text-blue-400">
                         <PushPinIcon weight="bold" /> Medium
                       </span>
-                      <strong className="text-sm">{summary?.priority_medium || 0}</strong>
+                      <strong className="text-sm text-foreground">{summary?.priority_medium || 0}</strong>
                     </div>
-                    <div className="flex items-center justify-between border-b border-white/5 pb-2">
-                      <span className="flex items-center gap-2 text-xs text-muted">
+                    <div className="flex items-center justify-between border-b border-border/60 pb-2">
+                      <span className="flex items-center gap-2 text-xs text-muted-foreground">
                         <ArrowDownIcon weight="bold" /> Low
                       </span>
-                      <strong className="text-sm">{summary?.priority_low || 0}</strong>
+                      <strong className="text-sm text-foreground">{summary?.priority_low || 0}</strong>
                     </div>
                   </CardContent>
                 </Card>
@@ -797,10 +826,10 @@ export default function DashboardView() {
                     const progressPercent = totalTicks > 0 ? (m.in_progress / totalTicks) * 100 : 0;
                     
                     return (
-                      <Card className="p-4 border border-white/5 bg-white/[0.02]" key={m.id}>
+                      <Card className="p-4 border border-border/40 bg-card/30" key={m.id}>
                         <div className="teammate-card">
                           <div className="teammate-card-header">
-                            <div className="teammate-info font-bold text-white text-sm">
+                            <div className="teammate-info font-bold text-foreground text-sm">
                               <span className="ds-avatar" style={{ margin: 0 }}>
                                 {m.username.slice(0, 2)}
                               </span>
@@ -812,7 +841,7 @@ export default function DashboardView() {
                           </div>
 
                           <div>
-                            <div className="flex justify-between text-xs text-muted mb-1 font-semibold">
+                            <div className="flex justify-between text-xs text-muted-foreground mb-1 font-semibold">
                               <span>Issues breakdown ({totalTicks})</span>
                               <span>{Math.round(donePercent)}% done</span>
                             </div>
@@ -828,7 +857,7 @@ export default function DashboardView() {
                   })}
                 </div>
 
-                <div className="workload-legend border-t border-white/5 pt-4">
+                <div className="workload-legend border-t border-border/60 pt-4">
                   <div className="legend-item">
                     <span className="legend-color done" />
                     <span>Done</span>
@@ -843,7 +872,7 @@ export default function DashboardView() {
                   </div>
                 </div>
 
-                <div className="border-t border-white/5 pt-4 overflow-x-auto">
+                <div className="border-t border-border/60 pt-4 overflow-x-auto">
                   <Table className="dashboard-table min-w-full">
                     <TableHeader>
                       <TableRow>
