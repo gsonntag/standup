@@ -2769,7 +2769,7 @@ body.sidebar-collapsed .page {
 
 .board {
   align-items: stretch;
-  min-height: min(58vh, 720px);
+  min-height: 0;
 }
 
 .board-empty-banner {
@@ -5873,10 +5873,17 @@ body {
   flex-direction: column;
   height: 100vh;
   overflow: clip;
+  padding-bottom: 0 !important;
+}
+
+/* Kill global section spacing inside the fixed-height board layout */
+.page-board > * + * {
+  margin-top: 0 !important;
 }
 
 .page-board .app-page-header {
   flex: 0 0 auto;
+  margin-bottom: 0 !important;
 }
 
 .board-shell {
