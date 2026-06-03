@@ -108,133 +108,175 @@ function BoardListView({ tickets, visibleColumns, onOpenTicket }) {
     );
   }
 
-  return (
-    <div className="rounded-xl border border-border/60 bg-card/40 overflow-hidden shadow-sm">
-      <Table>
-        <TableHeader className="bg-muted/40">
-          <TableRow className="hover:bg-transparent">
-            <TableHead className="w-20 font-semibold text-muted-foreground text-xs uppercase tracking-wider pl-6">ID</TableHead>
-            <TableHead className="font-semibold text-muted-foreground text-xs uppercase tracking-wider">Title</TableHead>
-            {visibleColumns.status && (
-              <TableHead className="w-36 font-semibold text-muted-foreground text-xs uppercase tracking-wider">Status</TableHead>
-            )}
-            {visibleColumns.priority && (
-              <TableHead className="w-32 font-semibold text-muted-foreground text-xs uppercase tracking-wider">Priority</TableHead>
-            )}
-            {visibleColumns.labels && (
-              <TableHead className="w-48 font-semibold text-muted-foreground text-xs uppercase tracking-wider">Labels</TableHead>
-            )}
-            {visibleColumns.assignees && (
-              <TableHead className="w-40 font-semibold text-muted-foreground text-xs uppercase tracking-wider">Assignees</TableHead>
-            )}
-            {visibleColumns.created && (
-              <TableHead className="w-28 font-semibold text-muted-foreground text-xs uppercase tracking-wider">Created</TableHead>
-            )}
-            {visibleColumns.due && (
-              <TableHead className="w-28 font-semibold text-muted-foreground text-xs uppercase tracking-wider">Due Date</TableHead>
-            )}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {tickets.map((ticket) => {
-            const priorityMeta = PRIORITIES.find((p) => p.value === ticket.priority);
-            const statusMeta = STATUSES.find((s) => s.value === ticket.status);
-            const StatusIcon = STATUS_ICONS[ticket.status] || CircleIcon;
-            const PriorityIcon = PRIORITY_ICONS[ticket.priority] || FlagIcon;
-            const assignees = assigneesForTicket(ticket);
+  const priorityKeys = ['urgent', 'high', 'medium', 'low'];
+  const groups = [
+    ...priorityKeys.map((key) => {
+      const config = {
+        urgent: { label: 'Urgent Priority', icon: FireIcon },
+        high: { label: 'High Priority', icon: ArrowUpIcon },
+        medium: { label: 'Medium Priority', icon: FlagIcon },
+        low: { label: 'Low Priority', icon: ArrowDownIcon },
+      }[key];
+      return {
+        key,
+        label: config.label,
+        Icon: config.icon,
+        tickets: tickets.filter((t) => t.priority === key),
+      };
+    }),
+    {
+      key: 'none',
+      label: 'No Priority',
+      Icon: FlagIcon,
+      tickets: tickets.filter((t) => !priorityKeys.includes(t.priority)),
+    }
+  ].filter((group) => group.tickets.length > 0);
 
-            return (
-              <TableRow
-                key={ticket.id}
-                className="cursor-pointer transition-colors hover:bg-muted/30 group border-b border-border/40"
-                onClick={() => onOpenTicket(ticket.id)}
-              >
-                <TableCell className="font-mono text-xs font-semibold text-muted-foreground/80 pl-6">
-                  #{ticket.number}
-                </TableCell>
-                <TableCell className="font-semibold text-foreground group-hover:text-primary transition-colors">
-                  {ticket.title}
-                </TableCell>
-                {visibleColumns.status && (
-                  <TableCell>
-                    <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium border border-border/60 bg-muted/30 text-foreground status-badge-${ticket.status}`}>
-                      <StatusIcon weight="fill" className={`w-3.5 h-3.5 status-icon-${ticket.status}`} />
-                      <span className="capitalize">{statusMeta?.label || ticket.status}</span>
-                    </span>
-                  </TableCell>
-                )}
-                {visibleColumns.priority && (
-                  <TableCell>
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium capitalize priority-chip-${ticket.priority}`}>
-                      <PriorityIcon weight="bold" className="w-3 h-3" />
-                      {priorityMeta?.label || ticket.priority}
-                    </span>
-                  </TableCell>
-                )}
-                {visibleColumns.labels && (
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {ticket.labels && ticket.labels.length > 0 ? (
-                        ticket.labels.map((label) => (
-                          <span
-                            key={label.id}
-                            className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider whitespace-nowrap"
-                            style={labelPillStyle(label.color)}
-                          >
-                            {label.name}
+  return (
+    <div className="space-y-8">
+      {groups.map((group) => (
+        <section key={group.key} className="space-y-3">
+          <div className="flex items-center gap-2 pl-2">
+            <span className={`flex items-center justify-center w-6 h-6 rounded-md priority-group-icon-${group.key}`}>
+              <group.Icon weight="bold" className="w-3.5 h-3.5" />
+            </span>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-foreground/80 flex items-center gap-2">
+              {group.label}
+              <span className="text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full font-medium">
+                {group.tickets.length} {group.tickets.length === 1 ? 'issue' : 'issues'}
+              </span>
+            </h3>
+          </div>
+
+          <div className="rounded-xl border border-border/60 bg-card/40 overflow-hidden shadow-sm">
+            <Table>
+              <TableHeader className="bg-muted/40">
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="w-20 font-semibold text-muted-foreground text-xs uppercase tracking-wider pl-6">ID</TableHead>
+                  <TableHead className="font-semibold text-muted-foreground text-xs uppercase tracking-wider">Title</TableHead>
+                  {visibleColumns.status && (
+                    <TableHead className="w-36 font-semibold text-muted-foreground text-xs uppercase tracking-wider">Status</TableHead>
+                  )}
+                  {visibleColumns.priority && (
+                    <TableHead className="w-32 font-semibold text-muted-foreground text-xs uppercase tracking-wider">Priority</TableHead>
+                  )}
+                  {visibleColumns.labels && (
+                    <TableHead className="w-48 font-semibold text-muted-foreground text-xs uppercase tracking-wider">Labels</TableHead>
+                  )}
+                  {visibleColumns.assignees && (
+                    <TableHead className="w-40 font-semibold text-muted-foreground text-xs uppercase tracking-wider">Assignees</TableHead>
+                  )}
+                  {visibleColumns.created && (
+                    <TableHead className="w-28 font-semibold text-muted-foreground text-xs uppercase tracking-wider">Created</TableHead>
+                  )}
+                  {visibleColumns.due && (
+                    <TableHead className="w-28 font-semibold text-muted-foreground text-xs uppercase tracking-wider">Due Date</TableHead>
+                  )}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {group.tickets.map((ticket) => {
+                  const priorityMeta = PRIORITIES.find((p) => p.value === ticket.priority);
+                  const statusMeta = STATUSES.find((s) => s.value === ticket.status);
+                  const StatusIcon = STATUS_ICONS[ticket.status] || CircleIcon;
+                  const PriorityIcon = PRIORITY_ICONS[ticket.priority] || FlagIcon;
+                  const assignees = assigneesForTicket(ticket);
+
+                  return (
+                    <TableRow
+                      key={ticket.id}
+                      className="cursor-pointer transition-colors hover:bg-muted/30 group border-b border-border/40"
+                      onClick={() => onOpenTicket(ticket.id)}
+                    >
+                      <TableCell className="font-mono text-xs font-semibold text-muted-foreground/80 pl-6">
+                        #{ticket.number}
+                      </TableCell>
+                      <TableCell className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                        {ticket.title}
+                      </TableCell>
+                      {visibleColumns.status && (
+                        <TableCell>
+                          <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium border border-border/60 bg-muted/30 text-foreground status-badge-${ticket.status}`}>
+                            <StatusIcon weight="fill" className={`w-3.5 h-3.5 status-icon-${ticket.status}`} />
+                            <span className="capitalize">{statusMeta?.label || ticket.status}</span>
                           </span>
-                        ))
-                      ) : (
-                        <span className="text-muted-foreground/40 text-xs">—</span>
+                        </TableCell>
                       )}
-                    </div>
-                  </TableCell>
-                )}
-                {visibleColumns.assignees && (
-                  <TableCell>
-                    <div className="flex items-center gap-1.5">
-                      {assignees.length > 0 ? (
-                        <div className="flex items-center -space-x-1.5 overflow-hidden">
-                          {assignees.map((assignee) => (
-                            <span
-                              key={assignee.id}
-                              className="ds-avatar w-6 h-6 text-[10px] border border-background shadow-sm"
-                              title={`@${assignee.username}`}
-                            >
-                              {assignee.username.slice(0, 2)}
+                      {visibleColumns.priority && (
+                        <TableCell>
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium capitalize priority-chip-${ticket.priority}`}>
+                            <PriorityIcon weight="bold" className="w-3 h-3" />
+                            {priorityMeta?.label || ticket.priority}
+                          </span>
+                        </TableCell>
+                      )}
+                      {visibleColumns.labels && (
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {ticket.labels && ticket.labels.length > 0 ? (
+                              ticket.labels.map((label) => (
+                                <span
+                                  key={label.id}
+                                  className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider whitespace-nowrap"
+                                  style={labelPillStyle(label.color)}
+                                >
+                                  {label.name}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="text-muted-foreground/40 text-xs">—</span>
+                            )}
+                          </div>
+                        </TableCell>
+                      )}
+                      {visibleColumns.assignees && (
+                        <TableCell>
+                          <div className="flex items-center gap-1.5">
+                            {assignees.length > 0 ? (
+                              <div className="flex items-center -space-x-1.5 overflow-hidden">
+                                {assignees.map((assignee) => (
+                                  <span
+                                    key={assignee.id}
+                                    className="ds-avatar w-6 h-6 text-[10px] border border-background shadow-sm"
+                                    title={`@${assignee.username}`}
+                                  >
+                                    {assignee.username.slice(0, 2)}
+                                  </span>
+                                ))}
+                                <span className="text-xs text-muted-foreground ml-1.5 block">
+                                  {assignees.map((a) => `@${a.username}`).join(', ')}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground/40 text-xs">Unassigned</span>
+                            )}
+                          </div>
+                        </TableCell>
+                      )}
+                      {visibleColumns.created && (
+                        <TableCell className="text-xs text-muted-foreground font-medium">
+                          {formatBoardDate(ticket.created_at)}
+                        </TableCell>
+                      )}
+                      {visibleColumns.due && (
+                        <TableCell className="text-xs font-medium">
+                          {ticket.due_date ? (
+                            <span className="text-muted-foreground">
+                              {formatBoardDate(ticket.due_date)}
                             </span>
-                          ))}
-                          <span className="text-xs text-muted-foreground ml-1.5 block">
-                            {assignees.map((a) => `@${a.username}`).join(', ')}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground/40 text-xs">Unassigned</span>
+                          ) : (
+                            <span className="text-muted-foreground/30">—</span>
+                          )}
+                        </TableCell>
                       )}
-                    </div>
-                  </TableCell>
-                )}
-                {visibleColumns.created && (
-                  <TableCell className="text-xs text-muted-foreground font-medium">
-                    {formatBoardDate(ticket.created_at)}
-                  </TableCell>
-                )}
-                {visibleColumns.due && (
-                  <TableCell className="text-xs font-medium">
-                    {ticket.due_date ? (
-                      <span className="text-muted-foreground">
-                        {formatBoardDate(ticket.due_date)}
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground/30">—</span>
-                    )}
-                  </TableCell>
-                )}
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        </section>
+      ))}
     </div>
   );
 }

@@ -697,9 +697,9 @@ export default function DashboardView() {
           </div>
 
           {activeTab === 'overview' && (
-            <div className="space-y-6">
+            <div className="space-y-8">
               {sprint && timeText && (
-                <Card className="ds-card glass p-4">
+                <Card className="ds-card glass p-5">
                   <div className="flex items-center justify-between text-xs font-semibold text-muted mb-1">
                     <span>Sprint Duration Timeline</span>
                     <span>{timeElapsedPercent}% elapsed</span>
@@ -710,12 +710,12 @@ export default function DashboardView() {
                 </Card>
               )}
 
-              <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                <Card className="ds-card glass lg:col-span-1 flex flex-col justify-center items-center py-6">
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                <Card className="ds-card glass lg:col-span-1 flex flex-col justify-center items-center py-8">
                   <SprintHealthGauge score={healthScore} />
                 </Card>
 
-                <div className="lg:col-span-3 grid grid-cols-2 gap-6">
+                <div className="lg:col-span-3 grid grid-cols-2 gap-8">
                   {summaryCards.map(({ label, value, icon: Icon, tone }) => (
                     <Card className="dashboard-summary-card ds-card glass" data-tone={tone} key={label}>
                       <CardHeader>
@@ -730,7 +730,7 @@ export default function DashboardView() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <Card className="ds-card glass">
                   <CardHeader>
                     <span className="ds-section-icon">
@@ -794,7 +794,7 @@ export default function DashboardView() {
           )}
 
           {activeTab === 'active_work' && (
-            <div className="space-y-4">
+            <div className="space-y-10">
               <Card className="ds-card glass">
                 <CardHeader>
                   <span className="ds-section-icon">
@@ -812,7 +812,7 @@ export default function DashboardView() {
                 </CardContent>
               </Card>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <Card className="ds-card glass">
                   <CardHeader>
                     <span className="ds-section-icon text-red-400">
@@ -868,30 +868,35 @@ export default function DashboardView() {
                     const progressPercent = totalTicks > 0 ? (m.in_progress / totalTicks) * 100 : 0;
                     
                     return (
-                      <Card className="p-4 border border-border/40 bg-card/30" key={m.id}>
-                        <div className="teammate-card">
-                          <div className="teammate-card-header">
-                            <div className="teammate-info font-bold text-foreground text-sm">
-                              <span className="ds-avatar" style={{ margin: 0 }}>
-                                {m.username.slice(0, 2)}
-                              </span>
-                              <span>@{m.username}</span>
-                            </div>
-                            <div className="teammate-points-badge">
-                              {m.points_done} / {m.total_points} pts
+                      <Card className="p-5 border border-border/40 bg-card/25 hover:bg-card/45 hover:border-border/60 transition-all duration-300 rounded-xl flex flex-col gap-4 shadow-sm" key={m.id}>
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <span className="ds-avatar w-10 h-10 text-xs font-bold shrink-0 shadow-inner flex items-center justify-center rounded-full bg-muted text-muted-foreground border border-border/40" style={{ margin: 0 }}>
+                              {m.username.slice(0, 2).toUpperCase()}
+                            </span>
+                            <div className="flex flex-col min-w-0">
+                              <span className="font-bold text-foreground text-sm truncate">@{m.username}</span>
+                              <span className="text-[10px] text-muted-foreground font-medium">{totalTicks} assigned issues</span>
                             </div>
                           </div>
+                          <div className="flex flex-col items-end text-right">
+                            <span className="text-sm font-extrabold text-foreground">
+                              {m.points_done} <span className="text-muted-foreground font-normal text-xs">/ {m.total_points} pts</span>
+                            </span>
+                            <span className="text-[9px] text-muted-foreground font-bold uppercase tracking-wider">Completed</span>
+                          </div>
+                        </div>
 
-                          <div>
-                            <div className="flex justify-between text-xs text-muted-foreground mb-1 font-semibold">
-                              <span>Issues breakdown ({totalTicks})</span>
-                              <span>{Math.round(donePercent)}% done</span>
-                            </div>
-                            <div className="workload-progress-track">
-                              <div className="workload-segment done" style={{ width: `${donePercent}%` }} />
-                              <div className="workload-segment review" style={{ width: `${reviewPercent}%` }} />
-                              <div className="workload-segment progress" style={{ width: `${progressPercent}%` }} />
-                            </div>
+                        <div className="space-y-2">
+                          <div className="workload-progress-track h-1.5 rounded-full bg-muted/40 overflow-hidden flex">
+                            <div className="workload-segment bg-[#27a644]" style={{ width: `${donePercent}%` }} title={`Done: ${Math.round(donePercent)}%`} />
+                            <div className="workload-segment bg-[#f5cd47]" style={{ width: `${reviewPercent}%` }} title={`In Review: ${Math.round(reviewPercent)}%`} />
+                            <div className="workload-segment bg-[#5e6ad2]" style={{ width: `${progressPercent}%` }} title={`In Progress: ${Math.round(progressPercent)}%`} />
+                          </div>
+                          <div className="flex items-center gap-3 text-[10px] font-semibold text-muted-foreground">
+                            <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-[#27a644]" /> {m.done} done</span>
+                            <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-[#5e6ad2]" /> {m.in_progress} active</span>
+                            <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-[#f5cd47]" /> {m.in_review} review</span>
                           </div>
                         </div>
                       </Card>
