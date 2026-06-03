@@ -103,7 +103,7 @@ function SprintHealthGauge({ score }) {
   }
 
   return (
-    <div className="flex flex-col items-center gap-4">
+    <div className="health-gauge-inner">
       <div className="health-gauge-container">
         <svg width="120" height="120" viewBox="0 0 120 120">
           <circle
@@ -129,11 +129,11 @@ function SprintHealthGauge({ score }) {
           <span className="health-gauge-label">Health</span>
         </div>
       </div>
-      <div className="flex flex-col items-center text-center gap-1 mt-1">
-        <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${statusBgClass} ${statusColorClass}`}>
+      <div className="health-gauge-status">
+        <span className={`health-gauge-pill border ${statusBgClass} ${statusColorClass}`}>
           {statusText}
         </span>
-        <span className="text-[11px] text-muted-foreground max-w-[150px]">
+        <span className="health-gauge-desc">
           Based on progress, blockers, and overdue tickets.
         </span>
       </div>
@@ -527,6 +527,107 @@ function getActivityBadgeClassAndIcon(item) {
   return { className: '', Icon: ActivityIcon };
 }
 
+const AVATAR_PALETTE = ['#5e6ad2','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#ec4899','#84cc16'];
+function avatarColorFor(username) {
+  let h = 0;
+  for (let i = 0; i < (username || '').length; i++) h = (h * 31 + username.charCodeAt(i)) >>> 0;
+  return AVATAR_PALETTE[h % AVATAR_PALETTE.length];
+}
+
+function groupActivityByDate(items, parseTs) {
+  const groups = new Map();
+  const now = new Date();
+  const todayStr = now.toDateString();
+  const yd = new Date(now); yd.setDate(yd.getDate() - 1);
+  const yestStr = yd.toDateString();
+
+  for (const item of items) {
+    const d = parseTs(item.created_at);
+    const ds = d?.toDateString?.() || '';
+    let label = ds === todayStr ? 'Today' : ds === yestStr ? 'Yesterday'
+      : d ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(d) : 'Earlier';
+    if (!groups.has(label)) groups.set(label, []);
+    groups.get(label).push(item);
+  }
+  return groups;
+}
+
+function ActivityFeed({ items, onTicketClick }) {
+  if (!items.length) {
+    return <div className="dashboard-empty-inline">No activity recorded for tickets in this sprint yet.</div>;
+  }
+
+  const groups = groupActivityByDate(items, parseTimestamp);
+
+  return (
+    <div className="activity-feed-v2">
+      {[...groups.entries()].map(([dateLabel, groupItems]) => (
+        <div key={dateLabel} className="activity-group">
+          <div className="activity-group-label">{dateLabel}</div>
+          <div className="activity-group-items">
+            {groupItems.map((item) => {
+              const { className: typeClass, Icon } = getActivityBadgeClassAndIcon(item);
+              const avatarColor = avatarColorFor(item.actor_username);
+              const initials = (item.actor_username || '?').slice(0, 2).toUpperCase();
+
+              return (
+                <div className="activity-row" key={item.id}>
+                  <div className="activity-row-left">
+                    <div className="activity-row-avatar" style={{ background: `${avatarColor}22`, color: avatarColor, borderColor: `${avatarColor}44` }}>
+                      {initials}
+                    </div>
+                    <div className={`activity-row-type-dot ${typeClass}`}>
+                      <Icon weight="bold" />
+                    </div>
+                  </div>
+                  <div className="activity-row-body">
+                    <div className="activity-row-headline">
+                      {buildActivityHeadline(item, onTicketClick)}
+                    </div>
+                    {item.kind === 'comment' && item.new_value && (
+                      <div className="activity-row-comment">{item.new_value}</div>
+                    )}
+                  </div>
+                  <div className="activity-row-time">{timeAgo(item.created_at)}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function buildActivityHeadline(item, onTicketClick) {
+  const actor = <span className="activity-actor">@{item.actor_username}</span>;
+  const ticket = (
+    <button
+      type="button"
+      className="activity-ticket-link"
+      onClick={() => onTicketClick(item.ticket_id)}
+    >
+      <span className="activity-ticket-num">#{item.ticket_number}</span>
+      {' '}{item.ticket_title}
+    </button>
+  );
+
+  if (item.kind === 'comment') return <>{actor} <span className="activity-action">commented on</span> {ticket}</>;
+  if (item.field === 'status') {
+    const to = item.new_value?.replaceAll('_', ' ') || 'none';
+    return <>{actor} <span className="activity-action">moved</span> {ticket} <span className="activity-action">to <strong>{to}</strong></span></>;
+  }
+  if (item.field === 'assignee') {
+    return item.new_value
+      ? <>{actor} <span className="activity-action">assigned</span> {ticket} <span className="activity-action">to <strong>@{item.new_value}</strong></span></>
+      : <>{actor} <span className="activity-action">unassigned</span> {ticket}</>;
+  }
+  if (item.field === 'priority') {
+    return <>{actor} <span className="activity-action">set priority of</span> {ticket} <span className="activity-action">to <strong className="capitalize">{item.new_value}</strong></span></>;
+  }
+  return <>{actor} <span className="activity-action">updated</span> {ticket}</>;
+}
+
 export default function DashboardView() {
   const [sprints, setSprints] = useState([]);
   const [sprintId, setSprintId] = useState('');
@@ -681,71 +782,59 @@ export default function DashboardView() {
 
       {sprintId && (
         <>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+          <div className="dashboard-topnav">
+            <nav className="dashboard-topnav-tabs">
+              {[
+                { key: 'overview',     label: 'Overview' },
+                { key: 'active_work',  label: 'Active Scope' },
+                { key: 'team',         label: 'Team Workload' },
+                { key: 'analytics',    label: 'Analytics' },
+                { key: 'activity',     label: 'Activity Feed' },
+              ].map(({ key, label }) => (
+                <button
+                  key={key}
+                  className={`dashboard-topnav-tab ${activeTab === key ? 'active' : ''}`}
+                  onClick={() => setActiveTab(key)}
+                >
+                  {label}
+                </button>
+              ))}
+            </nav>
             {sprint && (
-              <div className="dashboard-sprint-meta flex-wrap">
-                <Badge variant={sprint.status === 'active' ? 'default' : 'outline'}>{sprint.status}</Badge>
-                <span>
-                  {sprint.start_date} – {sprint.end_date}
-                </span>
-                {timeText && <span className="linear-muted-chip">{timeText}</span>}
+              <div className="dashboard-topnav-meta">
+                <Badge variant={sprint.status === 'active' ? 'default' : 'outline'} className="shrink-0">{sprint.status}</Badge>
+                <span className="dashboard-topnav-dates">{sprint.start_date} – {sprint.end_date}</span>
+                {timeText && <span className="linear-muted-chip shrink-0">{timeText}</span>}
               </div>
             )}
-
-            <div className="dashboard-tabs-container">
-              <button
-                className={`dashboard-tab-btn ${activeTab === 'overview' ? 'active' : ''}`}
-                onClick={() => setActiveTab('overview')}
-              >
-                Overview
-              </button>
-              <button
-                className={`dashboard-tab-btn ${activeTab === 'active_work' ? 'active' : ''}`}
-                onClick={() => setActiveTab('active_work')}
-              >
-                Active Scope
-              </button>
-              <button
-                className={`dashboard-tab-btn ${activeTab === 'team' ? 'active' : ''}`}
-                onClick={() => setActiveTab('team')}
-              >
-                Team Workload
-              </button>
-              <button
-                className={`dashboard-tab-btn ${activeTab === 'analytics' ? 'active' : ''}`}
-                onClick={() => setActiveTab('analytics')}
-              >
-                Analytics
-              </button>
-              <button
-                className={`dashboard-tab-btn ${activeTab === 'activity' ? 'active' : ''}`}
-                onClick={() => setActiveTab('activity')}
-              >
-                Activity Feed
-              </button>
-            </div>
           </div>
 
           {activeTab === 'overview' && (
-            <div className="space-y-4">
+            <div className="bento-overview">
               {sprint && timeText && (
                 <div className="sprint-timeline-row">
-                  <div className="flex items-center justify-between text-xs font-semibold mb-2">
-                    <span style={{ color: 'var(--linear-ink-subtle)' }}>Sprint Duration Timeline</span>
-                    <span style={{ color: 'var(--linear-ink-subtle)' }}>{timeElapsedPercent}% elapsed</span>
+                  <div className="sprint-timeline-header">
+                    <span className="sprint-timeline-label">Sprint Duration</span>
+                    <span className="sprint-timeline-meta">
+                      {sprint.start_date} – {sprint.end_date}
+                      <span className="sprint-timeline-pct">{timeElapsedPercent}% elapsed</span>
+                    </span>
                   </div>
-                  <div className="sprint-time-progress-bar" style={{ margin: 0 }}>
-                    <div className="sprint-time-progress-fill" style={{ width: `${timeElapsedPercent}%` }} />
+                  <div className="sprint-timeline-bar-wrap">
+                    <div className="sprint-time-progress-bar" style={{ margin: 0 }}>
+                      <div className="sprint-time-progress-fill" style={{ width: `${timeElapsedPercent}%` }} />
+                    </div>
+                    {timeText && <span className="sprint-timeline-remaining">{timeText}</span>}
                   </div>
                 </div>
               )}
 
-              <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-                <Card className="ds-card glass lg:col-span-1 flex flex-col justify-center items-center py-5">
+              <div className="bento-row-top">
+                <Card className="ds-card glass bento-health flex flex-col justify-center items-center py-8">
                   <SprintHealthGauge score={healthScore} />
                 </Card>
 
-                <div className="lg:col-span-3 grid grid-cols-2 gap-4">
+                <div className="bento-stats">
                   {summaryCards.map(({ label, value, icon: Icon, tone }) => (
                     <Card className="dashboard-summary-card ds-card glass" data-tone={tone} key={label}>
                       <CardHeader>
@@ -760,7 +849,7 @@ export default function DashboardView() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bento-row-bottom">
                 <Card className="ds-card glass">
                   <CardHeader>
                     <span className="ds-section-icon">
@@ -768,7 +857,7 @@ export default function DashboardView() {
                     </span>
                     <CardTitle>Sprint Progress</CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent className="space-y-5">
                     <div className="flex items-end justify-between">
                       <div>
                         <span className="text-3xl font-extrabold text-foreground">{completion}%</span>
@@ -792,44 +881,79 @@ export default function DashboardView() {
                     </span>
                     <CardTitle>Priority Distribution</CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent>
                     {(() => {
                       const urgent = summary?.priority_urgent || 0;
                       const high = summary?.priority_high || 0;
                       const medium = summary?.priority_medium || 0;
                       const low = summary?.priority_low || 0;
                       const total = urgent + high + medium + low;
-                      const getPct = (val) => (total > 0 ? Math.round((val / total) * 100) : 0);
 
                       const priorities = [
-                        { label: 'Urgent', count: urgent, color: 'bg-red-500', textClass: 'text-red-400', Icon: FireIcon },
-                        { label: 'High', count: high, color: 'bg-amber-500', textClass: 'text-amber-500', Icon: ArrowUpIcon },
-                        { label: 'Medium', count: medium, color: 'bg-blue-500', textClass: 'text-blue-400', Icon: PushPinIcon },
-                        { label: 'Low', count: low, color: 'bg-muted-foreground', textClass: 'text-muted-foreground', Icon: ArrowDownIcon },
-                      ];
+                        { label: 'Critical', count: urgent, hex: '#ef4444', Icon: FireIcon },
+                        { label: 'High',     count: high,   hex: '#f59e0b', Icon: ArrowUpIcon },
+                        { label: 'Medium',   count: medium, hex: '#5e6ad2', Icon: PushPinIcon },
+                        { label: 'Low',      count: low,    hex: '#6b7280', Icon: ArrowDownIcon },
+                      ].filter((p) => p.count > 0);
+
+                      if (total === 0) {
+                        return <div className="dashboard-empty-inline">No tickets in this sprint yet.</div>;
+                      }
+
+                      const radius = 38;
+                      const strokeWidth = 10;
+                      const circumference = 2 * Math.PI * radius;
+                      let acc = 0;
+                      const segments = priorities.map((p) => {
+                        const pct = p.count / total;
+                        const dash = `${pct * circumference} ${circumference}`;
+                        const offset = -(acc * circumference);
+                        acc += pct;
+                        return { ...p, dash, offset };
+                      });
 
                       return (
-                        <div className="space-y-3.5">
-                          {priorities.map(({ label, count, color, textClass, Icon }) => {
-                            const pct = getPct(count);
-                            return (
-                              <div key={label} className="space-y-1.5">
-                                <div className="flex items-center justify-between text-xs font-semibold">
-                                  <span className={`flex items-center gap-2 ${textClass}`}>
-                                    <Icon weight="bold" className="w-3.5 h-3.5" />
-                                    <span>{label}</span>
+                        <div className="priority-donut-layout">
+                          <div className="priority-donut-chart">
+                            <svg viewBox="0 0 100 100" width="100%" height="100%">
+                              <circle cx="50" cy="50" r={radius} fill="none" stroke="var(--border)" strokeWidth={strokeWidth} opacity="0.2" />
+                              {segments.map((seg, i) => (
+                                <circle
+                                  key={i}
+                                  cx="50" cy="50" r={radius}
+                                  fill="none"
+                                  stroke={seg.hex}
+                                  strokeWidth={strokeWidth}
+                                  strokeDasharray={seg.dash}
+                                  strokeDashoffset={seg.offset}
+                                  strokeLinecap="butt"
+                                  className="transition-all duration-500 ease-out"
+                                  style={{ transform: 'rotate(-90deg)', transformOrigin: 'center' }}
+                                />
+                              ))}
+                            </svg>
+                            <div className="priority-donut-center">
+                              <span className="text-2xl font-extrabold text-foreground">{total}</span>
+                              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">tickets</span>
+                            </div>
+                          </div>
+                          <div className="priority-donut-legend">
+                            {priorities.map(({ label, count, hex, Icon }) => (
+                              <div key={label} className="priority-legend-row">
+                                <div className="flex items-center gap-2">
+                                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: hex }} />
+                                  <span className="text-xs font-semibold text-foreground flex items-center gap-1">
+                                    <Icon weight="bold" className="w-3 h-3" style={{ color: hex }} />
+                                    {label}
                                   </span>
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-foreground">{count}</span>
-                                    <span className="text-[10px] text-muted-foreground">({pct}%)</span>
-                                  </div>
                                 </div>
-                                <div className="h-1 w-full bg-muted/30 rounded-full overflow-hidden">
-                                  <div className={`h-full ${color} rounded-full transition-all duration-500`} style={{ width: `${pct}%` }} />
+                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                  <span className="font-bold text-foreground">{count}</span>
+                                  <span>({Math.round((count / total) * 100)}%)</span>
                                 </div>
                               </div>
-                            );
-                          })}
+                            ))}
+                          </div>
                         </div>
                       );
                     })()}
@@ -840,7 +964,7 @@ export default function DashboardView() {
           )}
 
           {activeTab === 'active_work' && (
-            <div className="space-y-4">
+            <div className="space-y-8">
               <Card className="ds-card glass">
                 <CardHeader>
                   <span className="ds-section-icon">
@@ -858,7 +982,7 @@ export default function DashboardView() {
                 </CardContent>
               </Card>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <Card className="ds-card glass">
                   <CardHeader>
                     <span className="ds-section-icon text-red-400">
@@ -905,7 +1029,7 @@ export default function DashboardView() {
                 </span>
                 <CardTitle>Team workloads & delivery</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent className="space-y-7">
                 <div className="teammate-workload-grid">
                   {members.map((m) => {
                     const totalTicks = m.done + m.in_progress + m.in_review;
@@ -914,38 +1038,35 @@ export default function DashboardView() {
                     const progressPercent = totalTicks > 0 ? (m.in_progress / totalTicks) * 100 : 0;
                     
                     return (
-                      <Card className="p-5 border border-border/40 bg-card/25 hover:bg-card/45 hover:border-border/60 transition-all duration-300 rounded-xl flex flex-col gap-4 shadow-sm" key={m.id}>
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-3">
-                            <span className="ds-avatar w-10 h-10 text-xs font-bold shrink-0 shadow-inner flex items-center justify-center rounded-full bg-muted text-muted-foreground border border-border/40" style={{ margin: 0 }}>
+                      <div className="teammate-card-item" key={m.id}>
+                        <div className="teammate-card-top">
+                          <div className="teammate-card-identity">
+                            <span className="teammate-avatar">
                               {m.username.slice(0, 2).toUpperCase()}
                             </span>
-                            <div className="flex flex-col min-w-0">
-                              <span className="font-bold text-foreground text-sm truncate">@{m.username}</span>
-                              <span className="text-[10px] text-muted-foreground font-medium">{totalTicks} assigned issues</span>
+                            <div>
+                              <span className="teammate-name">@{m.username}</span>
+                              <span className="teammate-subtitle">{totalTicks} assigned</span>
                             </div>
                           </div>
-                          <div className="flex flex-col items-end text-right">
-                            <span className="text-sm font-extrabold text-foreground">
-                              {m.points_done} <span className="text-muted-foreground font-normal text-xs">/ {m.total_points} pts</span>
-                            </span>
-                            <span className="text-[9px] text-muted-foreground font-bold uppercase tracking-wider">Completed</span>
+                          <div className="teammate-card-pts">
+                            <span className="teammate-pts-value">{m.points_done}<span className="teammate-pts-total"> / {m.total_points} pts</span></span>
+                            <span className="teammate-pts-label">done</span>
                           </div>
                         </div>
-
-                        <div className="space-y-2">
-                          <div className="workload-progress-track h-1.5 rounded-full bg-muted/40 overflow-hidden flex">
+                        <div className="teammate-card-progress">
+                          <div className="workload-progress-track h-2 rounded-full overflow-hidden flex">
                             <div className="workload-segment bg-[#27a644]" style={{ width: `${donePercent}%` }} title={`Done: ${Math.round(donePercent)}%`} />
-                            <div className="workload-segment bg-[#f5cd47]" style={{ width: `${reviewPercent}%` }} title={`In Review: ${Math.round(reviewPercent)}%`} />
+                            <div className="workload-segment bg-[#f59e0b]" style={{ width: `${reviewPercent}%` }} title={`In Review: ${Math.round(reviewPercent)}%`} />
                             <div className="workload-segment bg-[#5e6ad2]" style={{ width: `${progressPercent}%` }} title={`In Progress: ${Math.round(progressPercent)}%`} />
                           </div>
-                          <div className="flex items-center gap-3 text-[10px] font-semibold text-muted-foreground">
-                            <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-[#27a644]" /> {m.done} done</span>
-                            <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-[#5e6ad2]" /> {m.in_progress} active</span>
-                            <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-[#f5cd47]" /> {m.in_review} review</span>
+                          <div className="teammate-card-legend">
+                            <span><span className="w-2 h-2 rounded-full bg-[#27a644] inline-block" /> {m.done} done</span>
+                            <span><span className="w-2 h-2 rounded-full bg-[#5e6ad2] inline-block" /> {m.in_progress} active</span>
+                            <span><span className="w-2 h-2 rounded-full bg-[#f59e0b] inline-block" /> {m.in_review} review</span>
                           </div>
                         </div>
-                      </Card>
+                      </div>
                     );
                   })}
                 </div>
@@ -1020,7 +1141,7 @@ export default function DashboardView() {
           )}
 
           {activeTab === 'analytics' && (
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-7 items-start">
               <Card className="ds-card glass xl:col-span-2">
                 <CardHeader>
                   <span className="ds-section-icon">
@@ -1055,25 +1176,8 @@ export default function DashboardView() {
                 </span>
                 <CardTitle>Sprint Activity Feed</CardTitle>
               </CardHeader>
-              <CardContent>
-                {recentActivity.length === 0 ? (
-                  <div className="dashboard-empty-inline">No activity recorded for tickets in this sprint yet.</div>
-                ) : (
-                  <div className="activity-timeline">
-                    {recentActivity.map((item) => {
-                      const { className, Icon } = getActivityBadgeClassAndIcon(item);
-                      return (
-                        <div className="activity-item" key={item.id}>
-                          <div className={`activity-badge ${className}`}>
-                            <Icon weight="bold" style={{ width: '10px', height: '10px' }} />
-                          </div>
-                          {renderActivityMessage(item, setActiveTicketId)}
-                          <div className="activity-time">{timeAgo(item.created_at)}</div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+              <CardContent className="px-0 pb-2">
+                <ActivityFeed items={recentActivity} onTicketClick={setActiveTicketId} />
               </CardContent>
             </Card>
           )}

@@ -2,7 +2,7 @@
 
 import { DndContext, DragOverlay, pointerWithin, rectIntersection, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { apiFetch } from '@/lib/client-api';
 import { PRIORITIES, STATUSES } from '@/lib/constants';
 import { labelPillStyle } from '@/lib/labels';
@@ -288,39 +288,29 @@ function BoardListView({ tickets, visibleColumns, onOpenTicket }) {
 function HiddenColumnsRail({ statuses, onRestore }) {
   if (!statuses.length) return null;
   return (
-    <div className="board-column hidden-columns-rail border-l border-border/40 bg-card/10 flex flex-col w-64 shrink-0">
-      <div className="board-column-header flex items-center justify-between px-4 py-3 border-b border-border/40">
-        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-          <SlidersHorizontalIcon className="w-3.5 h-3.5" />
-          Hidden Columns ({statuses.length})
-        </span>
-      </div>
-      <div className="p-3 space-y-2 overflow-y-auto flex-1">
-        {statuses.map((status) => {
-          const StatusIcon = STATUS_ICONS[status.value] || CircleIcon;
-          return (
-            <button
-              key={status.value}
-              type="button"
-              className="w-full flex items-center justify-between p-2.5 rounded-lg border border-border/60 bg-card hover:bg-accent/60 hover:text-accent-foreground text-left text-xs font-medium text-foreground transition-all shadow-sm group"
-              onClick={() => onRestore(status.value)}
-            >
-              <div className="flex items-center gap-2">
-                <StatusIcon weight="fill" className={`w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors status-icon-${status.value}`} />
-                <span>{status.label}</span>
-              </div>
-              <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">
-                Restore
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
+    <>
+      {statuses.map((status) => {
+        const StatusIcon = STATUS_ICONS[status.value] || CircleIcon;
+        return (
+          <button
+            key={status.value}
+            type="button"
+            className={`hidden-col-strip status-strip-${status.value}`}
+            onClick={() => onRestore(status.value)}
+            title={`Restore ${status.label}`}
+          >
+            <StatusIcon weight="bold" className="hidden-col-strip-icon" />
+            <span className="hidden-col-strip-label">{status.label}</span>
+            <span className="hidden-col-strip-hint">Click to restore</span>
+          </button>
+        );
+      })}
+    </>
   );
 }
 
 export default function Board({ sprintId, currentUser }) {
+  const boardRef = useRef(null);
   const [tickets, setTickets] = useState([]);
   const [users, setUsers] = useState([]);
   const [selectedTicket, setSelectedTicket] = useState(null);
@@ -374,6 +364,19 @@ export default function Board({ sprintId, currentUser }) {
     }
     setWipDraft(draft);
   }
+
+  useEffect(() => {
+    const el = boardRef.current;
+    if (!el) return;
+    const onWheel = (e) => {
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY) || Math.abs(e.deltaX) > 2) {
+        e.preventDefault();
+        el.scrollLeft += e.deltaX;
+      }
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
 
   useEffect(() => {
     fetchTickets();
@@ -499,30 +502,6 @@ export default function Board({ sprintId, currentUser }) {
     setSelectedTicket({ id: ticketId, editing });
   }
 
-  function handleBoardWheel(event) {
-    const board = event.currentTarget;
-    const deltaY = event.deltaY || 0;
-    const deltaX = event.deltaX || 0;
-
-    // If it's primarily a horizontal scroll (e.g. trackpad swipe), let the browser handle it natively
-    if (Math.abs(deltaX) > Math.abs(deltaY)) {
-      return;
-    }
-
-    // It's a vertical scroll gesture
-    const columnBody = event.target.closest?.('.board-column-body');
-    // If the scroll is inside a scrollable column body, let it scroll vertically
-    if (columnBody && board.contains(columnBody)) {
-      return;
-    }
-
-    // Otherwise, translate vertical wheel scroll to horizontal board scroll
-    const canScrollBoard = board.scrollWidth > board.clientWidth + 1;
-    if (canScrollBoard && deltaY !== 0) {
-      event.preventDefault();
-      board.scrollLeft += deltaY;
-    }
-  }
 
   async function assignTicket(ticketId, assigneeIds) {
     const nextAssigneeIds = Array.isArray(assigneeIds) ? assigneeIds : (assigneeIds ? [assigneeIds] : []);
@@ -610,7 +589,7 @@ export default function Board({ sprintId, currentUser }) {
 
   return (
     <div className={`board-shell${swimlane !== 'none' && boardMode === 'board' ? ' board-shell-swimlanes' : ''}${boardMode === 'list' ? ' board-shell-list' : ''}`}>
-      <div className="board-toolbar" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
+      <div className="board-toolbar" style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
         <div className="btn-group">
           <Button type="button" size="sm" variant={view === 'all' ? 'default' : 'outline'} onClick={() => setView('all')}>Whole Sprint</Button>
           <Button type="button" size="sm" variant={view === 'mine' ? 'default' : 'outline'} onClick={() => setView('mine')}>My Tickets</Button>
@@ -691,7 +670,7 @@ export default function Board({ sprintId, currentUser }) {
 
       {showWipSettings && (
         <Card className="wip-settings-panel mb-3">
-          <CardContent className="flex flex-wrap items-end gap-4 pt-4">
+          <CardContent className="flex flex-wrap items-end gap-4 py-4">
             {STATUSES.map((s) => (
               <div key={s.value} className="grid gap-1">
                 <Label>{s.label}</Label>
@@ -722,7 +701,7 @@ export default function Board({ sprintId, currentUser }) {
       ) : (
         <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           {swimlane !== 'none' ? (
-            <div className="swimlanes" onWheel={handleBoardWheel}>
+            <div className="swimlanes">
               {lanes.map((lane) => (
                 <div key={lane.key} className="swimlane">
                   <div className="swimlane-label">{lane.label}</div>
@@ -757,7 +736,7 @@ export default function Board({ sprintId, currentUser }) {
                   </span>
                 </div>
               )}
-              <div className={`board${loaded && !visibleTickets.length ? ' board-empty' : ''}`} onWheel={handleBoardWheel}>
+              <div ref={boardRef} className={`board${loaded && !visibleTickets.length ? ' board-empty' : ''}`}>
                 {shownStatuses.map((status) => (
                   <BoardColumn
                     key={status.value}

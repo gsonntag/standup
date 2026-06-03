@@ -465,8 +465,38 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
   if (!ticket) {
     return (
       <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
-        <DialogContent>
-          Loading...
+        <DialogContent className="ticket-detail-dialog-modern" showCloseButton={false}>
+          <div className="ticket-detail-skeleton">
+            <div className="ticket-detail-skeleton-header">
+              <div className="td-skel-row" style={{ gap: '0.5rem', marginBottom: '0.75rem' }}>
+                <div className="td-skel-pill" style={{ width: 48 }} />
+                <div className="td-skel-pill" style={{ width: 72 }} />
+                <div className="td-skel-pill" style={{ width: 56 }} />
+              </div>
+              <div className="td-skel-line" style={{ width: '55%', height: 24, marginBottom: '0.5rem' }} />
+              <div className="td-skel-line" style={{ width: '35%', height: 16 }} />
+            </div>
+            <div className="ticket-detail-layout" style={{ flex: 1, minHeight: 0 }}>
+              <div className="ticket-detail-main" style={{ gap: '1.25rem' }}>
+                <div className="td-skel-line" style={{ width: '100%', height: 12 }} />
+                <div className="td-skel-line" style={{ width: '90%', height: 12 }} />
+                <div className="td-skel-line" style={{ width: '75%', height: 12 }} />
+                <div style={{ marginTop: '1.5rem' }}>
+                  <div className="td-skel-line" style={{ width: '100%', height: 12, marginBottom: '0.5rem' }} />
+                  <div className="td-skel-line" style={{ width: '85%', height: 12, marginBottom: '0.5rem' }} />
+                  <div className="td-skel-line" style={{ width: '60%', height: 12 }} />
+                </div>
+              </div>
+              <div className="ticket-detail-sidebar-modern" style={{ gap: '1rem' }}>
+                {[80, 60, 70, 50, 65].map((w, i) => (
+                  <div key={i}>
+                    <div className="td-skel-line" style={{ width: '40%', height: 10, marginBottom: '0.4rem' }} />
+                    <div className="td-skel-line" style={{ width: `${w}%`, height: 14 }} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     );
