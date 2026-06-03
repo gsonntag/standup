@@ -3746,9 +3746,9 @@ body:has(.app-sidebar) .page {
   display: flex;
   grid-template-columns: none;
   align-items: center;
-  gap: 0.625rem;
-  min-height: 3.5rem;
-  padding: 1rem 1.125rem 0.75rem !important;
+  gap: 0.75rem;
+  min-height: 3.75rem;
+  padding: 1.5rem 1.5rem 1rem;
   border-bottom: 1px solid var(--ds-border);
 }
 
@@ -3765,7 +3765,7 @@ body:has(.app-sidebar) .page {
 .dashboard-table-card [data-slot="card-content"],
 .team-table-card [data-slot="card-content"],
 .team-form-card [data-slot="card-content"] {
-  padding: 1rem 1.125rem !important;
+  padding: 1.25rem 1.5rem 1.5rem;
 }
 
 .ds-section-icon {
@@ -3791,7 +3791,7 @@ body:has(.app-sidebar) .page {
   align-items: center;
   justify-content: space-between;
   min-height: auto;
-  padding: 1rem 1rem 0 !important;
+  padding: 1.25rem 1.25rem 0;
   border-bottom: 0;
 }
 
@@ -3804,7 +3804,7 @@ body:has(.app-sidebar) .page {
 }
 
 .dashboard-summary-card [data-slot="card-content"] {
-  padding: 0.875rem 1rem 1rem !important;
+  padding: 0.75rem 1.25rem 1.25rem;
   color: var(--ds-text);
   font-size: 2.1rem;
   font-weight: 780;
@@ -7448,7 +7448,8 @@ html[data-theme="light"] .dashboard-tab-btn.active {
 
 .health-gauge-circle-bg {
   fill: none;
-  stroke: rgba(255, 255, 255, 0.05);
+  stroke: var(--border);
+  opacity: 0.35;
   stroke-width: 9;
 }
 
@@ -7486,7 +7487,8 @@ html[data-theme="light"] .dashboard-tab-btn.active {
 .sprint-time-progress-bar {
   width: 100%;
   height: 6px;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--border);
+  opacity: 0.8;
   border-radius: 999px;
   overflow: hidden;
   margin: 0.625rem 0;
@@ -7502,8 +7504,8 @@ html[data-theme="light"] .dashboard-tab-btn.active {
 /* Teammate stacked workload progress bars */
 .teammate-workload-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1.25rem;
 }
 
 .teammate-card {

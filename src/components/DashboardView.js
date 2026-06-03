@@ -326,35 +326,77 @@ function StatusBreakdown({ summary }) {
   const pct = (val) => Math.round((val / total) * 100);
 
   const statuses = [
-    { label: 'Backlog', val: summary.backlog, color: '#62666d' },
-    { label: 'To do', val: summary.todo, color: 'rgba(255,255,255,0.15)' },
-    { label: 'In progress', val: summary.in_progress, color: '#5e6ad2' },
+    { label: 'Backlog', val: summary.backlog, color: '#6b7280' },
+    { label: 'To do', val: summary.todo, color: '#9ca3af' },
+    { label: 'In progress', val: '#5e6ad2' },
     { label: 'PR', val: summary.in_review, color: '#f5cd47' },
     { label: 'Done', val: summary.done, color: '#27a644' },
   ].filter((s) => s.val > 0);
 
+  const radius = 36;
+  const strokeWidth = 8;
+  const circumference = 2 * Math.PI * radius;
+
+  let accumulatedPercent = 0;
+  const segments = statuses.map((s) => {
+    const percentage = (s.val / total) * 100;
+    const strokeDasharray = `${(percentage / 100) * circumference} ${circumference}`;
+    const strokeDashoffset = -((accumulatedPercent / 100) * circumference);
+    accumulatedPercent += percentage;
+    return {
+      ...s,
+      percentage,
+      strokeDasharray,
+      strokeDashoffset,
+    };
+  });
+
   return (
-    <div className="space-y-4">
-      <div className="workload-progress-track" style={{ height: '14px' }}>
-        {statuses.map((s, i) => (
-          <div
-            key={i}
-            className="workload-segment"
-            style={{
-              width: `${(s.val / total) * 100}%`,
-              backgroundColor: s.color,
-            }}
-            title={`${s.label}: ${s.val} ticket${s.val === 1 ? '' : 's'} (${pct(s.val)}%)`}
+    <div className="flex flex-col items-center sm:flex-row sm:justify-around gap-6 py-4">
+      <div className="relative flex items-center justify-center w-36 h-36 shrink-0">
+        <svg viewBox="0 0 100 100" className="w-full h-full transform -rotate-90">
+          <circle
+            cx="50"
+            cy="50"
+            r={radius}
+            fill="none"
+            stroke="var(--border)"
+            strokeWidth={strokeWidth}
+            className="opacity-25"
           />
-        ))}
+          {segments.map((seg, i) => (
+            <circle
+              key={i}
+              cx="50"
+              cy="50"
+              r={radius}
+              fill="none"
+              stroke={seg.color}
+              strokeWidth={strokeWidth}
+              strokeDasharray={seg.strokeDasharray}
+              strokeDashoffset={seg.strokeDashoffset}
+              strokeLinecap="butt"
+              className="transition-all duration-500 ease-out"
+              style={{ transformOrigin: 'center' }}
+            />
+          ))}
+        </svg>
+        <div className="absolute flex flex-col items-center justify-center text-center">
+          <span className="text-3xl font-extrabold tracking-tight text-foreground">{total}</span>
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Tickets</span>
+        </div>
       </div>
-      <div className="flex flex-wrap gap-x-6 gap-y-2 justify-between text-xs pt-1">
+      <div className="flex-1 space-y-2.5 min-w-[160px] w-full">
         {statuses.map((s, i) => (
-          <div key={i} className="flex items-center gap-1.5">
-            <span className="legend-color" style={{ backgroundColor: s.color, width: '10px', height: '10px' }} />
-            <span className="font-bold">{s.val}</span>
-            <span className="text-muted">{s.label}</span>
-            <span className="text-muted text-[10px]">({pct(s.val)}%)</span>
+          <div key={i} className="flex items-center justify-between p-1.5 rounded-lg hover:bg-muted/30 transition-colors">
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+              <span className="text-xs font-semibold text-foreground">{s.label}</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span className="font-bold text-foreground">{s.val}</span>
+              <span>({pct(s.val)}%)</span>
+            </div>
           </div>
         ))}
       </div>
@@ -655,7 +697,7 @@ export default function DashboardView() {
           </div>
 
           {activeTab === 'overview' && (
-            <div className="space-y-4">
+            <div className="space-y-6">
               {sprint && timeText && (
                 <Card className="ds-card glass p-4">
                   <div className="flex items-center justify-between text-xs font-semibold text-muted mb-1">
@@ -668,12 +710,12 @@ export default function DashboardView() {
                 </Card>
               )}
 
-              <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                 <Card className="ds-card glass lg:col-span-1 flex flex-col justify-center items-center py-6">
                   <SprintHealthGauge score={healthScore} />
                 </Card>
 
-                <div className="lg:col-span-3 grid grid-cols-2 gap-4">
+                <div className="lg:col-span-3 grid grid-cols-2 gap-6">
                   {summaryCards.map(({ label, value, icon: Icon, tone }) => (
                     <Card className="dashboard-summary-card ds-card glass" data-tone={tone} key={label}>
                       <CardHeader>
@@ -688,7 +730,7 @@ export default function DashboardView() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Card className="ds-card glass">
                   <CardHeader>
                     <span className="ds-section-icon">

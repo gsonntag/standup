@@ -22,6 +22,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import BoardColumn from './BoardColumn';
 import TicketCard from './TicketCard';
 import TicketDetail from './TicketDetail';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { useToast, ToastContainer } from './Toast';
 import { useRealtime } from '@/lib/realtime';
 import {
@@ -92,60 +100,141 @@ function StatusGroupHeader({ status, tickets }) {
 }
 
 function BoardListView({ tickets, visibleColumns, onOpenTicket }) {
-  const groupedTickets = STATUSES
-    .map((status) => ({
-      status,
-      tickets: tickets.filter((ticket) => ticket.status === status.value),
-    }))
-    .filter((group) => group.tickets.length);
+  if (!tickets || tickets.length === 0) {
+    return (
+      <div className="board-list-empty text-center py-12 text-muted-foreground font-medium bg-card/20 rounded-xl border border-border/40">
+        No issues in this view.
+      </div>
+    );
+  }
 
   return (
-    <div className="board-list-shell">
-      {groupedTickets.map(({ status, tickets: groupTickets }) => (
-        <section key={status.value} className="linear-list-group">
-          <StatusGroupHeader status={status} tickets={groupTickets} />
-          <div className="linear-list-rows">
-            {groupTickets.map((ticket) => {
-              const priorityMeta = PRIORITIES.find((priority) => priority.value === ticket.priority);
-              const StatusIcon = STATUS_ICONS[ticket.status] || CircleIcon;
-              const PriorityIcon = PRIORITY_ICONS[ticket.priority] || FlagIcon;
-              const assignees = assigneesForTicket(ticket);
-              return (
-                <button key={ticket.id} type="button" className="linear-list-row" onClick={() => onOpenTicket(ticket.id)}>
-                  <span className="linear-list-id">#{ticket.number}</span>
-                  {visibleColumns.status && (
-                    <span className={`ticket-card-status-icon status-icon-${ticket.status}`}>
-                      <StatusIcon weight="fill" />
+    <div className="rounded-xl border border-border/60 bg-card/40 overflow-hidden shadow-sm">
+      <Table>
+        <TableHeader className="bg-muted/40">
+          <TableRow className="hover:bg-transparent">
+            <TableHead className="w-20 font-semibold text-muted-foreground text-xs uppercase tracking-wider pl-6">ID</TableHead>
+            <TableHead className="font-semibold text-muted-foreground text-xs uppercase tracking-wider">Title</TableHead>
+            {visibleColumns.status && (
+              <TableHead className="w-36 font-semibold text-muted-foreground text-xs uppercase tracking-wider">Status</TableHead>
+            )}
+            {visibleColumns.priority && (
+              <TableHead className="w-32 font-semibold text-muted-foreground text-xs uppercase tracking-wider">Priority</TableHead>
+            )}
+            {visibleColumns.labels && (
+              <TableHead className="w-48 font-semibold text-muted-foreground text-xs uppercase tracking-wider">Labels</TableHead>
+            )}
+            {visibleColumns.assignees && (
+              <TableHead className="w-40 font-semibold text-muted-foreground text-xs uppercase tracking-wider">Assignees</TableHead>
+            )}
+            {visibleColumns.created && (
+              <TableHead className="w-28 font-semibold text-muted-foreground text-xs uppercase tracking-wider">Created</TableHead>
+            )}
+            {visibleColumns.due && (
+              <TableHead className="w-28 font-semibold text-muted-foreground text-xs uppercase tracking-wider">Due Date</TableHead>
+            )}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {tickets.map((ticket) => {
+            const priorityMeta = PRIORITIES.find((p) => p.value === ticket.priority);
+            const statusMeta = STATUSES.find((s) => s.value === ticket.status);
+            const StatusIcon = STATUS_ICONS[ticket.status] || CircleIcon;
+            const PriorityIcon = PRIORITY_ICONS[ticket.priority] || FlagIcon;
+            const assignees = assigneesForTicket(ticket);
+
+            return (
+              <TableRow
+                key={ticket.id}
+                className="cursor-pointer transition-colors hover:bg-muted/30 group border-b border-border/40"
+                onClick={() => onOpenTicket(ticket.id)}
+              >
+                <TableCell className="font-mono text-xs font-semibold text-muted-foreground/80 pl-6">
+                  #{ticket.number}
+                </TableCell>
+                <TableCell className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                  {ticket.title}
+                </TableCell>
+                {visibleColumns.status && (
+                  <TableCell>
+                    <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium border border-border/60 bg-muted/30 text-foreground status-badge-${ticket.status}`}>
+                      <StatusIcon weight="fill" className={`w-3.5 h-3.5 status-icon-${ticket.status}`} />
+                      <span className="capitalize">{statusMeta?.label || ticket.status}</span>
                     </span>
-                  )}
-                  <span className="linear-list-title">{ticket.title}</span>
-                  <span className="linear-list-meta">
-                    {visibleColumns.priority && (
-                      <span className={`linear-priority-chip linear-priority-${ticket.priority}`}>
-                        <span className="linear-priority-dot" />
-                        <PriorityIcon weight="bold" />
-                        {priorityMeta?.label || ticket.priority}
+                  </TableCell>
+                )}
+                {visibleColumns.priority && (
+                  <TableCell>
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium capitalize priority-chip-${ticket.priority}`}>
+                      <PriorityIcon weight="bold" className="w-3 h-3" />
+                      {priorityMeta?.label || ticket.priority}
+                    </span>
+                  </TableCell>
+                )}
+                {visibleColumns.labels && (
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1">
+                      {ticket.labels && ticket.labels.length > 0 ? (
+                        ticket.labels.map((label) => (
+                          <span
+                            key={label.id}
+                            className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider whitespace-nowrap"
+                            style={labelPillStyle(label.color)}
+                          >
+                            {label.name}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-muted-foreground/40 text-xs">—</span>
+                      )}
+                    </div>
+                  </TableCell>
+                )}
+                {visibleColumns.assignees && (
+                  <TableCell>
+                    <div className="flex items-center gap-1.5">
+                      {assignees.length > 0 ? (
+                        <div className="flex items-center -space-x-1.5 overflow-hidden">
+                          {assignees.map((assignee) => (
+                            <span
+                              key={assignee.id}
+                              className="ds-avatar w-6 h-6 text-[10px] border border-background shadow-sm"
+                              title={`@${assignee.username}`}
+                            >
+                              {assignee.username.slice(0, 2)}
+                            </span>
+                          ))}
+                          <span className="text-xs text-muted-foreground ml-1.5 block">
+                            {assignees.map((a) => `@${a.username}`).join(', ')}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground/40 text-xs">Unassigned</span>
+                      )}
+                    </div>
+                  </TableCell>
+                )}
+                {visibleColumns.created && (
+                  <TableCell className="text-xs text-muted-foreground font-medium">
+                    {formatBoardDate(ticket.created_at)}
+                  </TableCell>
+                )}
+                {visibleColumns.due && (
+                  <TableCell className="text-xs font-medium">
+                    {ticket.due_date ? (
+                      <span className="text-muted-foreground">
+                        {formatBoardDate(ticket.due_date)}
                       </span>
+                    ) : (
+                      <span className="text-muted-foreground/30">—</span>
                     )}
-                    {visibleColumns.labels && ticket.labels?.map((label) => (
-                      <span key={label.id} className="label linear-label" style={labelPillStyle(label.color)}>
-                        <span className="linear-label-dot" />
-                        {label.name}
-                      </span>
-                    ))}
-                    {visibleColumns.assignees && (
-                      <span className="linear-muted-chip">{assignees.length ? assignees.map((assignee) => `@${assignee.username}`).join(', ') : 'Unassigned'}</span>
-                    )}
-                    {visibleColumns.created && <span className="linear-muted-chip">{formatBoardDate(ticket.created_at)}</span>}
-                    {visibleColumns.due && ticket.due_date && <span className="linear-muted-chip">Due {formatBoardDate(ticket.due_date)}</span>}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      ))}
-      {!groupedTickets.length && <div className="board-list-empty">No issues in this view.</div>}
+                  </TableCell>
+                )}
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
     </div>
   );
 }
@@ -153,22 +242,35 @@ function BoardListView({ tickets, visibleColumns, onOpenTicket }) {
 function HiddenColumnsRail({ statuses, onRestore }) {
   if (!statuses.length) return null;
   return (
-    <aside className="hidden-columns-rail">
-      <div className="hidden-columns-title">
-        <span>Hidden columns</span>
+    <div className="board-column hidden-columns-rail border-l border-border/40 bg-card/10 flex flex-col w-64 shrink-0">
+      <div className="board-column-header flex items-center justify-between px-4 py-3 border-b border-border/40">
+        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+          <SlidersHorizontalIcon className="w-3.5 h-3.5" />
+          Hidden Columns ({statuses.length})
+        </span>
       </div>
-      <div className="hidden-columns-list">
+      <div className="p-3 space-y-2 overflow-y-auto flex-1">
         {statuses.map((status) => {
           const StatusIcon = STATUS_ICONS[status.value] || CircleIcon;
           return (
-            <button key={status.value} type="button" className="hidden-column-card" onClick={() => onRestore(status.value)}>
-              <StatusIcon weight="fill" />
-              <span>{status.label}</span>
+            <button
+              key={status.value}
+              type="button"
+              className="w-full flex items-center justify-between p-2.5 rounded-lg border border-border/60 bg-card hover:bg-accent/60 hover:text-accent-foreground text-left text-xs font-medium text-foreground transition-all shadow-sm group"
+              onClick={() => onRestore(status.value)}
+            >
+              <div className="flex items-center gap-2">
+                <StatusIcon weight="fill" className={`w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors status-icon-${status.value}`} />
+                <span>{status.label}</span>
+              </div>
+              <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                Restore
+              </span>
             </button>
           );
         })}
       </div>
-    </aside>
+    </div>
   );
 }
 
@@ -353,20 +455,27 @@ export default function Board({ sprintId, currentUser }) {
 
   function handleBoardWheel(event) {
     const board = event.currentTarget;
-    const columnBody = event.target.closest?.('.board-column-body');
     const deltaY = event.deltaY || 0;
     const deltaX = event.deltaX || 0;
-    const horizontalDelta = Math.abs(deltaX) >= 1 ? deltaX : 0;
-    const canScrollBoard = board.scrollWidth > board.clientWidth + 1;
-    if (!canScrollBoard) return;
 
-    if (!horizontalDelta && columnBody && board.contains(columnBody)) {
+    // If it's primarily a horizontal scroll (e.g. trackpad swipe), let the browser handle it natively
+    if (Math.abs(deltaX) > Math.abs(deltaY)) {
       return;
     }
 
-    if (!horizontalDelta) return;
-    event.preventDefault();
-    board.scrollLeft += horizontalDelta;
+    // It's a vertical scroll gesture
+    const columnBody = event.target.closest?.('.board-column-body');
+    // If the scroll is inside a scrollable column body, let it scroll vertically
+    if (columnBody && board.contains(columnBody)) {
+      return;
+    }
+
+    // Otherwise, translate vertical wheel scroll to horizontal board scroll
+    const canScrollBoard = board.scrollWidth > board.clientWidth + 1;
+    if (canScrollBoard && deltaY !== 0) {
+      event.preventDefault();
+      board.scrollLeft += deltaY;
+    }
   }
 
   async function assignTicket(ticketId, assigneeIds) {
