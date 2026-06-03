@@ -5871,9 +5871,17 @@ body {
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  overflow: clip;
+  height: 100dvh;
+  overflow: hidden;
   padding-bottom: 0 !important;
+}
+
+/* Lock html + body so no scroll bleeds past the board */
+html:has(.page-board),
+body:has(.page-board) {
+  overflow: hidden !important;
+  height: 100dvh !important;
+  max-height: 100dvh !important;
 }
 
 /* Kill global section spacing inside the fixed-height board layout */
