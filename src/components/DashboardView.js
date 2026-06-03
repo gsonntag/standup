@@ -44,7 +44,14 @@ function assigneeLabel(ticket) {
 }
 
 function DashboardTicketList({ tickets, emptyText, showDue = false, showBlockers = false, onTicketClick }) {
-  if (!tickets.length) return <div className="dashboard-empty-inline">{emptyText}</div>;
+  if (!tickets.length) {
+    return (
+      <div className="dashboard-empty-inline">
+        <CheckCircleIcon className="w-5 h-5 text-muted-foreground/60" weight="light" />
+        <span>{emptyText}</span>
+      </div>
+    );
+  }
 
   return (
     <div className="dashboard-ticket-list">
@@ -79,33 +86,56 @@ function SprintHealthGauge({ score }) {
   const offset = circumference - (score / 100) * circumference;
 
   let strokeColor = '#27a644';
-  if (score < 50) strokeColor = '#c9372c';
-  else if (score < 75) strokeColor = '#f5cd47';
+  let statusText = 'Healthy';
+  let statusColorClass = 'text-green-500';
+  let statusBgClass = 'bg-green-500/10 border-green-500/20';
+
+  if (score < 50) {
+    strokeColor = '#c9372c';
+    statusText = 'Critical';
+    statusColorClass = 'text-red-500';
+    statusBgClass = 'bg-red-500/10 border-red-500/20';
+  } else if (score < 75) {
+    strokeColor = '#f5cd47';
+    statusText = 'Needs Attention';
+    statusColorClass = 'text-amber-500';
+    statusBgClass = 'bg-amber-500/10 border-amber-500/20';
+  }
 
   return (
-    <div className="health-gauge-container">
-      <svg width="120" height="120" viewBox="0 0 120 120">
-        <circle
-          cx="60"
-          cy="60"
-          r={radius}
-          className="health-gauge-circle-bg"
-          strokeWidth={strokeWidth}
-        />
-        <circle
-          cx="60"
-          cy="60"
-          r={radius}
-          className="health-gauge-circle-progress"
-          strokeWidth={strokeWidth}
-          stroke={strokeColor}
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-        />
-      </svg>
-      <div className="health-gauge-value">
-        <span>{score}%</span>
-        <span className="health-gauge-label">Health</span>
+    <div className="flex flex-col items-center gap-4">
+      <div className="health-gauge-container">
+        <svg width="120" height="120" viewBox="0 0 120 120">
+          <circle
+            cx="60"
+            cy="60"
+            r={radius}
+            className="health-gauge-circle-bg"
+            strokeWidth={strokeWidth}
+          />
+          <circle
+            cx="60"
+            cy="60"
+            r={radius}
+            className="health-gauge-circle-progress"
+            strokeWidth={strokeWidth}
+            stroke={strokeColor}
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+          />
+        </svg>
+        <div className="health-gauge-value">
+          <span>{score}%</span>
+          <span className="health-gauge-label">Health</span>
+        </div>
+      </div>
+      <div className="flex flex-col items-center text-center gap-1 mt-1">
+        <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${statusBgClass} ${statusColorClass}`}>
+          {statusText}
+        </span>
+        <span className="text-[11px] text-muted-foreground max-w-[150px]">
+          Based on progress, blockers, and overdue tickets.
+        </span>
       </div>
     </div>
   );
@@ -762,31 +792,47 @@ export default function DashboardView() {
                     </span>
                     <CardTitle>Priority Distribution</CardTitle>
                   </CardHeader>
-                  <CardContent className="grid grid-cols-2 gap-x-4 gap-y-3">
-                    <div className="flex items-center justify-between border-b border-border/60 pb-2">
-                      <span className="flex items-center gap-2 text-xs text-red-400">
-                        <FireIcon weight="fill" /> Urgent
-                      </span>
-                      <strong className="text-sm text-foreground">{summary?.priority_urgent || 0}</strong>
-                    </div>
-                    <div className="flex items-center justify-between border-b border-border/60 pb-2">
-                      <span className="flex items-center gap-2 text-xs text-amber-500">
-                        <ArrowUpIcon weight="bold" /> High
-                      </span>
-                      <strong className="text-sm text-foreground">{summary?.priority_high || 0}</strong>
-                    </div>
-                    <div className="flex items-center justify-between border-b border-border/60 pb-2">
-                      <span className="flex items-center gap-2 text-xs text-blue-400">
-                        <PushPinIcon weight="bold" /> Medium
-                      </span>
-                      <strong className="text-sm text-foreground">{summary?.priority_medium || 0}</strong>
-                    </div>
-                    <div className="flex items-center justify-between border-b border-border/60 pb-2">
-                      <span className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <ArrowDownIcon weight="bold" /> Low
-                      </span>
-                      <strong className="text-sm text-foreground">{summary?.priority_low || 0}</strong>
-                    </div>
+                  <CardContent className="space-y-4">
+                    {(() => {
+                      const urgent = summary?.priority_urgent || 0;
+                      const high = summary?.priority_high || 0;
+                      const medium = summary?.priority_medium || 0;
+                      const low = summary?.priority_low || 0;
+                      const total = urgent + high + medium + low;
+                      const getPct = (val) => (total > 0 ? Math.round((val / total) * 100) : 0);
+
+                      const priorities = [
+                        { label: 'Urgent', count: urgent, color: 'bg-red-500', textClass: 'text-red-400', Icon: FireIcon },
+                        { label: 'High', count: high, color: 'bg-amber-500', textClass: 'text-amber-500', Icon: ArrowUpIcon },
+                        { label: 'Medium', count: medium, color: 'bg-blue-500', textClass: 'text-blue-400', Icon: PushPinIcon },
+                        { label: 'Low', count: low, color: 'bg-muted-foreground', textClass: 'text-muted-foreground', Icon: ArrowDownIcon },
+                      ];
+
+                      return (
+                        <div className="space-y-3.5">
+                          {priorities.map(({ label, count, color, textClass, Icon }) => {
+                            const pct = getPct(count);
+                            return (
+                              <div key={label} className="space-y-1.5">
+                                <div className="flex items-center justify-between text-xs font-semibold">
+                                  <span className={`flex items-center gap-2 ${textClass}`}>
+                                    <Icon weight="bold" className="w-3.5 h-3.5" />
+                                    <span>{label}</span>
+                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-foreground">{count}</span>
+                                    <span className="text-[10px] text-muted-foreground">({pct}%)</span>
+                                  </div>
+                                </div>
+                                <div className="h-1 w-full bg-muted/30 rounded-full overflow-hidden">
+                                  <div className={`h-full ${color} rounded-full transition-all duration-500`} style={{ width: `${pct}%` }} />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
                   </CardContent>
                 </Card>
               </div>
@@ -904,7 +950,7 @@ export default function DashboardView() {
                   })}
                 </div>
 
-                <div className="workload-legend border-t border-border/60 pt-4">
+                <div className="workload-legend mt-2">
                   <div className="legend-item">
                     <span className="legend-color done" />
                     <span>Done</span>
@@ -919,7 +965,7 @@ export default function DashboardView() {
                   </div>
                 </div>
 
-                <div className="border-t border-border/60 pt-4 overflow-x-auto">
+                <div className="border-t border-border/60 pt-6 mt-6 overflow-x-auto">
                   <Table className="dashboard-table min-w-full">
                     <TableHeader>
                       <TableRow>

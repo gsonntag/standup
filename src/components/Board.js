@@ -133,7 +133,7 @@ function BoardListView({ tickets, visibleColumns, onOpenTicket }) {
   ].filter((group) => group.tickets.length > 0);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-12">
       {groups.map((group) => (
         <section key={group.key} className="space-y-3">
           <div className="flex items-center gap-2 pl-2">
@@ -196,9 +196,12 @@ function BoardListView({ tickets, visibleColumns, onOpenTicket }) {
                       </TableCell>
                       {visibleColumns.status && (
                         <TableCell>
-                          <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium border border-border/60 bg-muted/30 text-foreground status-badge-${ticket.status}`}>
+                          <span
+                            data-slot="badge"
+                            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold border status-badge status-badge-${ticket.status}`}
+                          >
                             <StatusIcon weight="fill" className={`w-3.5 h-3.5 status-icon-${ticket.status}`} />
-                            <span className="capitalize">{statusMeta?.label || ticket.status}</span>
+                            <span className="capitalize">{statusMeta?.label || ticket.status.replaceAll('_', ' ')}</span>
                           </span>
                         </TableCell>
                       )}
@@ -217,9 +220,10 @@ function BoardListView({ tickets, visibleColumns, onOpenTicket }) {
                               ticket.labels.map((label) => (
                                 <span
                                   key={label.id}
-                                  className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider whitespace-nowrap"
+                                  className="label linear-label text-[10px] font-bold uppercase tracking-wider whitespace-nowrap"
                                   style={labelPillStyle(label.color)}
                                 >
+                                  <span className="linear-label-dot" />
                                   {label.name}
                                 </span>
                               ))
