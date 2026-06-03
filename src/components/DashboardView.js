@@ -681,9 +681,9 @@ export default function DashboardView() {
 
       {sprintId && (
         <>
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
             {sprint && (
-              <div className="dashboard-sprint-meta mb-0 flex-wrap">
+              <div className="dashboard-sprint-meta flex-wrap">
                 <Badge variant={sprint.status === 'active' ? 'default' : 'outline'}>{sprint.status}</Badge>
                 <span>
                   {sprint.start_date} – {sprint.end_date}
@@ -692,7 +692,7 @@ export default function DashboardView() {
               </div>
             )}
 
-            <div className="dashboard-tabs-container mb-0">
+            <div className="dashboard-tabs-container">
               <button
                 className={`dashboard-tab-btn ${activeTab === 'overview' ? 'active' : ''}`}
                 onClick={() => setActiveTab('overview')}
@@ -727,25 +727,25 @@ export default function DashboardView() {
           </div>
 
           {activeTab === 'overview' && (
-            <div className="space-y-8">
+            <div className="space-y-4">
               {sprint && timeText && (
-                <Card className="ds-card glass p-5">
-                  <div className="flex items-center justify-between text-xs font-semibold text-muted mb-1">
-                    <span>Sprint Duration Timeline</span>
-                    <span>{timeElapsedPercent}% elapsed</span>
+                <div className="sprint-timeline-row">
+                  <div className="flex items-center justify-between text-xs font-semibold mb-2">
+                    <span style={{ color: 'var(--linear-ink-subtle)' }}>Sprint Duration Timeline</span>
+                    <span style={{ color: 'var(--linear-ink-subtle)' }}>{timeElapsedPercent}% elapsed</span>
                   </div>
-                  <div className="sprint-time-progress-bar">
+                  <div className="sprint-time-progress-bar" style={{ margin: 0 }}>
                     <div className="sprint-time-progress-fill" style={{ width: `${timeElapsedPercent}%` }} />
                   </div>
-                </Card>
+                </div>
               )}
 
-              <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-                <Card className="ds-card glass lg:col-span-1 flex flex-col justify-center items-center py-8">
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                <Card className="ds-card glass lg:col-span-1 flex flex-col justify-center items-center py-5">
                   <SprintHealthGauge score={healthScore} />
                 </Card>
 
-                <div className="lg:col-span-3 grid grid-cols-2 gap-8">
+                <div className="lg:col-span-3 grid grid-cols-2 gap-4">
                   {summaryCards.map(({ label, value, icon: Icon, tone }) => (
                     <Card className="dashboard-summary-card ds-card glass" data-tone={tone} key={label}>
                       <CardHeader>
@@ -760,7 +760,7 @@ export default function DashboardView() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Card className="ds-card glass">
                   <CardHeader>
                     <span className="ds-section-icon">
@@ -840,7 +840,7 @@ export default function DashboardView() {
           )}
 
           {activeTab === 'active_work' && (
-            <div className="space-y-10">
+            <div className="space-y-4">
               <Card className="ds-card glass">
                 <CardHeader>
                   <span className="ds-section-icon">
@@ -858,7 +858,7 @@ export default function DashboardView() {
                 </CardContent>
               </Card>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Card className="ds-card glass">
                   <CardHeader>
                     <span className="ds-section-icon text-red-400">
@@ -1020,7 +1020,7 @@ export default function DashboardView() {
           )}
 
           {activeTab === 'analytics' && (
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
               <Card className="ds-card glass xl:col-span-2">
                 <CardHeader>
                   <span className="ds-section-icon">
