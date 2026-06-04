@@ -292,6 +292,32 @@ db.exec(`
     FOREIGN KEY (repo_id, sha) REFERENCES github_commits(repo_id, sha) ON DELETE CASCADE
   );
   CREATE INDEX IF NOT EXISTS idx_ticket_commits_ticket ON ticket_commits(ticket_id, linked_at DESC);
+
+  CREATE TABLE IF NOT EXISTS github_pull_requests (
+    repo_id      TEXT NOT NULL REFERENCES github_repositories(id) ON DELETE CASCADE,
+    number       INTEGER NOT NULL,
+    title        TEXT NOT NULL,
+    state        TEXT NOT NULL,
+    html_url     TEXT NOT NULL,
+    author_login TEXT,
+    created_at   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL,
+    merged_at    TEXT,
+    synced_at    TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (repo_id, number)
+  );
+  CREATE INDEX IF NOT EXISTS idx_github_prs_repo_date ON github_pull_requests(repo_id, created_at DESC);
+
+  CREATE TABLE IF NOT EXISTS ticket_pull_requests (
+    ticket_id  TEXT NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+    repo_id    TEXT NOT NULL REFERENCES github_repositories(id) ON DELETE CASCADE,
+    pr_number  INTEGER NOT NULL,
+    linked_by  TEXT NOT NULL REFERENCES users(id),
+    linked_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (ticket_id, repo_id, pr_number),
+    FOREIGN KEY (repo_id, pr_number) REFERENCES github_pull_requests(repo_id, number) ON DELETE CASCADE
+  );
+  CREATE INDEX IF NOT EXISTS idx_ticket_prs_ticket ON ticket_pull_requests(ticket_id, linked_at DESC);
 `);
 
 db.exec(`
