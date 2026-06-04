@@ -15,6 +15,7 @@ import {
 } from '@/lib/discord';
 import { classifyDue, markDueReminderSent } from '@/lib/reminders';
 import { attachMarkdownImagesToTicket } from '@/lib/markdown-attachments';
+import { extractUploadUrls, pruneUnreferencedUploads } from '@/lib/upload-cleanup';
 
 const STATUS_VALUES = new Set(STATUSES.map((s) => s.value));
 const PRIORITY_VALUES = new Set(PRIORITIES.map((p) => p.value));
@@ -366,6 +367,11 @@ export const PATCH = withAuth(async (request, user, context) => {
       }
     });
     tx();
+
+    // If the description changed, drop any upload no longer referenced anywhere.
+    if ('description' in body) {
+      await pruneUnreferencedUploads(db, extractUploadUrls(existing.description));
+    }
   }
 
   // Handle position-based ordering
@@ -494,12 +500,15 @@ export const PATCH = withAuth(async (request, user, context) => {
 export const DELETE = withAuth(async (_request, user, context) => {
   const db = getDb();
   const id = await getId(context);
-  const ticket = db.prepare('SELECT creator_id FROM tickets WHERE id = ?').get(id);
+  const ticket = db.prepare('SELECT creator_id, description FROM tickets WHERE id = ?').get(id);
   if (!ticket) return jsonError('Ticket not found.', 404);
   if (user.role !== 'admin' && ticket.creator_id !== user.id) {
     return jsonError('Only the ticket creator or an admin can delete this ticket.', 403);
   }
+  const commentBodies = db.prepare('SELECT content FROM comments WHERE ticket_id = ?').all(id).map((r) => r.content);
+  const uploadUrls = extractUploadUrls(ticket.description, ...commentBodies);
   db.prepare('DELETE FROM tickets WHERE id = ?').run(id);
+  await pruneUnreferencedUploads(db, uploadUrls);
   publish({ kind: 'ticket', id, action: 'deleted' });
   return NextResponse.json({ ok: true });
 });

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { jsonError, withAuth } from '@/lib/api';
 import { getDb } from '@/lib/db';
+import { extractUploadUrls, pruneUnreferencedUploads } from '@/lib/upload-cleanup';
 
 export const POST = withAuth(async (request, user) => {
   const db = getDb();
@@ -8,15 +9,18 @@ export const POST = withAuth(async (request, user) => {
   if (!Array.isArray(ids) || !ids.length) return jsonError('ids required.');
 
   const failedIds = [];
+  const deletedUploadUrls = [];
   const tx = db.transaction(() => {
     for (const id of ids) {
-      const ticket = db.prepare('SELECT creator_id FROM tickets WHERE id = ?').get(id);
+      const ticket = db.prepare('SELECT creator_id, description FROM tickets WHERE id = ?').get(id);
       if (!ticket) { failedIds.push(id); continue; }
 
       if (doDelete) {
         if (user.role !== 'admin' && ticket.creator_id !== user.id) {
           failedIds.push(id); continue;
         }
+        const commentBodies = db.prepare('SELECT content FROM comments WHERE ticket_id = ?').all(id).map((r) => r.content);
+        deletedUploadUrls.push(...extractUploadUrls(ticket.description, ...commentBodies));
         db.prepare('DELETE FROM tickets WHERE id = ?').run(id);
         continue;
       }
@@ -56,6 +60,7 @@ export const POST = withAuth(async (request, user) => {
     }
   });
   tx();
+  await pruneUnreferencedUploads(db, deletedUploadUrls);
 
   if (failedIds.length) {
     return NextResponse.json({ ok: false, failed_ids: failedIds });

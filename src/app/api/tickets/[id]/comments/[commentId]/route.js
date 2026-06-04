@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { jsonError, withAuth } from '@/lib/api';
 import { getDb } from '@/lib/db';
+import { extractUploadUrls, pruneUnreferencedUploads } from '@/lib/upload-cleanup';
 
 async function getIds(context) {
   const params = await context.params;
@@ -16,5 +17,6 @@ export const DELETE = withAuth(async (_request, user, context) => {
   if (comment.author_id !== user.id && user.role !== 'admin') return jsonError('Forbidden.', 403);
   if (comment.deleted_at) return jsonError('Already deleted.', 409);
   db.prepare("UPDATE comments SET deleted_at = datetime('now'), deleted_by = ? WHERE id = ?").run(user.id, commentId);
+  await pruneUnreferencedUploads(db, extractUploadUrls(comment.content));
   return NextResponse.json({ ok: true });
 });
