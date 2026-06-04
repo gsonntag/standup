@@ -122,3 +122,19 @@ export async function fetchRepositoryCommitsAcrossBranches(owner, name) {
   };
 }
 
+export async function fetchRepositoryPullRequests(owner, name) {
+  const repoPath = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`;
+  const pulls = await githubPaginatedRequest(`${repoPath}/pulls`, { state: 'open' });
+  return pulls.map((pr) => ({
+    number: pr.number,
+    title: pr.title || '',
+    state: pr.state || 'open',
+    html_url: pr.html_url,
+    author_login: pr.user?.login || null,
+    created_at: pr.created_at,
+    updated_at: pr.updated_at,
+    merged_at: pr.merged_at || null,
+  }));
+}
+
+

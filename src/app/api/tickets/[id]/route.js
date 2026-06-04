@@ -364,6 +364,7 @@ export const PATCH = withAuth(async (request, user, context) => {
       }
       if ('github_repo_id' in body && (body.github_repo_id || null) !== (existing.github_repo_id || null)) {
         db.prepare('DELETE FROM ticket_commits WHERE ticket_id = ?').run(id);
+        db.prepare('DELETE FROM ticket_pull_requests WHERE ticket_id = ?').run(id);
       }
     });
     tx();

@@ -28,6 +28,7 @@ import {
   FlagIcon,
   GitCommitIcon,
   GitForkIcon,
+  GitPullRequestIcon,
   KanbanIcon,
   LinkIcon,
   PaperclipIcon,
@@ -89,6 +90,13 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
   const [commitLoading, setCommitLoading] = useState(false);
   const [commitSyncing, setCommitSyncing] = useState(false);
   const [commitError, setCommitError] = useState('');
+  const [relatedPrs, setRelatedPrs] = useState([]);
+  const [prPickerOpen, setPrPickerOpen] = useState(false);
+  const [prOptions, setPrOptions] = useState([]);
+  const [prSearch, setPrSearch] = useState('');
+  const [prLoading, setPrLoading] = useState(false);
+  const [prSyncing, setPrSyncing] = useState(false);
+  const [prError, setPrError] = useState('');
   const [activeTab, setActiveTab] = useState('comments');
   const [pendingStatus, setPendingStatus] = useState(null);
 
@@ -128,6 +136,12 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
     setRelatedCommits(data.commits || []);
   }
 
+  async function fetchRelatedPrs() {
+    const res = await apiFetch(`/api/tickets/${activeTicketId}/prs`);
+    const data = await res.json();
+    setRelatedPrs(data.prs || []);
+  }
+
   async function fetchCurrentUser() {
     const res = await apiFetch('/api/auth/me');
     if (res.ok) {
@@ -145,6 +159,7 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
     fetchTicket();
     fetchComments();
     fetchRelatedCommits();
+    fetchRelatedPrs();
     fetchCurrentUser();
     apiFetch('/api/users').then((r) => r.json()).then((d) => setUsers(d.users || []));
     apiFetch('/api/sprints').then((r) => r.json()).then((d) => setSprints(d.sprints || []));
@@ -184,6 +199,9 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
         setRelatedCommits([]);
         setCommitOptions([]);
         setCommitPickerOpen(false);
+        setRelatedPrs([]);
+        setPrOptions([]);
+        setPrPickerOpen(false);
       }
     }
   }
@@ -442,6 +460,64 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
     }
   }
 
+  async function fetchPrOptions(search = prSearch) {
+    if (!ticket.github_repo_id) return;
+    setPrError('');
+    setPrLoading(true);
+    const params = new URLSearchParams({ ticket_id: activeTicketId, limit: '100' });
+    if (search) params.set('q', search);
+    const res = await apiFetch(`/api/github/repositories/${ticket.github_repo_id}/prs?${params.toString()}`);
+    const data = await res.json();
+    setPrLoading(false);
+    if (!res.ok) {
+      setPrError(data.error || 'Failed to load pull requests.');
+      return;
+    }
+    setPrOptions(data.prs || []);
+  }
+
+  async function syncPrs() {
+    if (!ticket.github_repo_id) return;
+    setPrError('');
+    setPrSyncing(true);
+    const res = await apiFetch(`/api/github/repositories/${ticket.github_repo_id}/sync-prs`, { method: 'POST' });
+    const data = await res.json();
+    setPrSyncing(false);
+    if (!res.ok) {
+      setPrError(data.error || 'Failed to refresh pull requests.');
+      return;
+    }
+    fetchPrOptions();
+  }
+
+  async function linkPr(prNumber) {
+    const res = await apiFetch(`/api/tickets/${activeTicketId}/prs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pr_number: prNumber }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setPrError(data.error || 'Failed to link pull request.');
+      return;
+    }
+    setRelatedPrs(data.prs || []);
+    fetchPrOptions();
+    fetchTicket();
+  }
+
+  async function unlinkPr(prNumber) {
+    const res = await apiFetch(`/api/tickets/${activeTicketId}/prs`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pr_number: prNumber }),
+    });
+    if (res.ok) {
+      setRelatedPrs((prev) => prev.filter((pr) => pr.number !== prNumber));
+      fetchPrOptions();
+    }
+  }
+
   function firstLine(message) {
     return (message || '').split('\n')[0];
   }
@@ -609,6 +685,7 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
                 <TabsTrigger value="comments"><ChatCircleTextIcon weight="bold" />Comments</TabsTrigger>
                 <TabsTrigger value="activity"><ActivityIcon weight="bold" />Activity</TabsTrigger>
                 <TabsTrigger value="commits"><GitCommitIcon weight="bold" />Commits</TabsTrigger>
+                <TabsTrigger value="prs"><GitPullRequestIcon weight="bold" />PRs</TabsTrigger>
                 <TabsTrigger value="attachments"><PaperclipIcon weight="bold" />Attachments</TabsTrigger>
               </TabsList>
 
@@ -730,6 +807,85 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
                               </div>
                               <Button type="button" size="sm" variant="outline" disabled={commit.linked} onClick={() => linkCommit(commit.sha)}>
                                 {commit.linked ? 'Linked' : 'Link'}
+                              </Button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+                </section>
+              </TabsContent>
+
+              <TabsContent value="prs">
+                <section className="ticket-detail-section">
+                  <div className="ticket-detail-section-header">
+                    <div>
+                      <h3>Related pull requests</h3>
+                      <p>Link pull requests back to this issue.</p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={!ticket.github_repo_id}
+                      onClick={() => {
+                        const nextOpen = !prPickerOpen;
+                        setPrPickerOpen(nextOpen);
+                        if (nextOpen) fetchPrOptions();
+                      }}
+                    >
+                      <GitPullRequestIcon weight="bold" />
+                      Link pull request
+                    </Button>
+                  </div>
+                  {!ticket.github_repo_id && <div className="ticket-detail-empty">Select a repository before linking pull requests.</div>}
+                  {ticket.github_repo_id && relatedPrs.length === 0 && <div className="ticket-detail-empty">No pull requests linked.</div>}
+                  {relatedPrs.length > 0 && (
+                    <ul className="commit-list">
+                      {relatedPrs.map((pr) => (
+                        <li className="commit-row" key={pr.number}>
+                          <div className="commit-main">
+                            <a href={pr.html_url} target="_blank" rel="noopener noreferrer" className="text-mono">#{pr.number}</a>
+                            <span>{pr.title}</span>
+                            <span className="text-muted text-sm">@{pr.author_login || 'unknown'} · state: {pr.state} · {timeAgo(pr.created_at)}</span>
+                          </div>
+                          <Button type="button" size="sm" variant="outline" onClick={() => unlinkPr(pr.number)}>Unlink</Button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {prPickerOpen && ticket.github_repo_id && (
+                    <div className="label-picker-dropdown commit-picker">
+                      <div className="ticket-detail-inline-controls">
+                        <Input
+                          type="search"
+                          value={prSearch}
+                          onChange={(e) => setPrSearch(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') fetchPrOptions(prSearch);
+                          }}
+                          placeholder="Search pull requests"
+                        />
+                        <Button type="button" size="sm" variant="outline" onClick={() => fetchPrOptions(prSearch)} disabled={prLoading}>Search</Button>
+                        <Button type="button" size="sm" variant="outline" onClick={syncPrs} disabled={prSyncing}>
+                          {prSyncing ? 'Refreshing...' : 'Refresh from GitHub'}
+                        </Button>
+                      </div>
+                      {prError && <div className="form-error">{prError}</div>}
+                      {prLoading && <div className="ticket-detail-empty">Loading pull requests...</div>}
+                      {!prLoading && prOptions.length === 0 && <div className="ticket-detail-empty">No open pull requests.</div>}
+                      {!prLoading && prOptions.length > 0 && (
+                        <ul className="commit-list">
+                          {prOptions.map((pr) => (
+                            <li className="commit-row" key={pr.number}>
+                              <div className="commit-main">
+                                <span className="text-mono">#{pr.number}</span>
+                                <span>{pr.title}</span>
+                                <span className="text-muted text-sm">@{pr.author_login || 'unknown'} · {timeAgo(pr.created_at)}</span>
+                              </div>
+                              <Button type="button" size="sm" variant="outline" disabled={pr.linked} onClick={() => linkPr(pr.number)}>
+                                {pr.linked ? 'Linked' : 'Link'}
                               </Button>
                             </li>
                           ))}
