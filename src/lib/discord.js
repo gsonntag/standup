@@ -120,9 +120,9 @@ export async function notifyDiscord({ content, embeds, pingIds, importantIds } =
   }
 }
 
-function ticketUrl(ticketId) {
+function ticketUrl(ticketNumber) {
   const base = process.env.APP_BASE_URL;
-  return base ? `${base.replace(/\/$/, '')}/tickets?ticket=${ticketId}` : undefined;
+  return base ? `${base.replace(/\/$/, '')}/ticket/${ticketNumber}` : undefined;
 }
 
 export function notifyTicketCreated(ticket, { creatorName, assigneeDiscordId, assigneeDiscordIds } = {}) {
@@ -132,7 +132,7 @@ export function notifyTicketCreated(ticket, { creatorName, assigneeDiscordId, as
     importantIds: ids,
     embeds: [{
       title: `🆕 #${ticket.number} ${ticket.title}`,
-      url: ticketUrl(ticket.id),
+      url: ticketUrl(ticket.number),
       description: `Created by ${creatorName || 'someone'}${mention}`,
       color: 0x0969da,
     }],
@@ -143,7 +143,7 @@ function assignedEmbed(ticket, { actorName, assigneeDiscordId, assigneeName }) {
   const who = assigneeDiscordId ? `<@${assigneeDiscordId}>` : (assigneeName || 'someone');
   return {
     title: `👤 #${ticket.number} ${ticket.title}`,
-    url: ticketUrl(ticket.id),
+    url: ticketUrl(ticket.number),
     description: `Assigned to ${who} by ${actorName || 'someone'}`,
     color: 0x8250df,
   };
@@ -166,7 +166,7 @@ export function notifyTicketUnassigned(ticket, { actorName, oldAssigneeDiscordId
     pingIds: [oldAssigneeDiscordId],
     embeds: [{
       title: `🔄 #${ticket.number} ${ticket.title}`,
-      url: ticketUrl(ticket.id),
+      url: ticketUrl(ticket.number),
       description: `${destination} by ${actorName || 'someone'}`,
       color: 0x6e7781,
     }],
@@ -179,7 +179,7 @@ export function notifyReviewRequested(ticket, { actorName, reviewerDiscordIds = 
     importantIds: reviewerDiscordIds,
     embeds: [{
       title: `Review requested on #${ticket.number}`,
-      url: ticketUrl(ticket.id),
+      url: ticketUrl(ticket.number),
       description: `${actorName || 'Someone'} requested your review on #${ticket.number} ${ticket.title}`,
       color: 0x5e6ad2,
     }],
@@ -192,7 +192,7 @@ export function notifyComment(ticket, { actorName, body, pingDiscordIds = [], me
     importantIds: mentionDiscordIds,
     embeds: [{
       title: `💬 #${ticket.number} ${ticket.title}`,
-      url: ticketUrl(ticket.id),
+      url: ticketUrl(ticket.number),
       description: `${actorName || 'Someone'} commented:\n${(body || '').slice(0, 500)}`,
       color: 0x57606a,
     }],
@@ -206,7 +206,7 @@ export function notifyStatusChanged(ticket, { actorName, oldStatus, newStatus, p
     pingIds: pingDiscordIds,
     embeds: [{
       title: `📋 #${ticket.number} ${ticket.title}`,
-      url: ticketUrl(ticket.id),
+      url: ticketUrl(ticket.number),
       description: `Status: ${from} → **${to}** (by ${actorName || 'someone'})`,
       color: 0x0969da,
     }],
@@ -219,7 +219,7 @@ export function notifyBlockerResolved(ticket, { resolvedBlocker, pingDiscordIds 
     pingIds: pingDiscordIds,
     embeds: [{
       title: `✅ #${ticket.number} ${ticket.title} is unblocked`,
-      url: ticketUrl(ticket.id),
+      url: ticketUrl(ticket.number),
       description: `Blocker ${blockerRef} is done — this ticket is ready to start.`,
       color: 0x2da44e,
     }],
@@ -237,7 +237,7 @@ function dueEmbed(ticket, kind) {
   if (!variant) return null;
   return {
     title: `${variant.emoji} #${ticket.number} ${ticket.title}`,
-    url: ticketUrl(ticket.id),
+    url: ticketUrl(ticket.number),
     description: `This ticket ${variant.text} (due ${ticket.due_date}).`,
     color: variant.color,
   };

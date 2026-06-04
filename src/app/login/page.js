@@ -49,7 +49,9 @@ export default function LoginPage() {
         return;
       }
 
-      router.push(data.user?.must_change_password ? '/team' : '/');
+      const next = new URLSearchParams(window.location.search).get('next');
+      const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? next : '/';
+      router.push(data.user?.must_change_password ? '/team' : safeNext);
       router.refresh();
     } catch {
       setError('Network error. Try again.');

@@ -121,7 +121,7 @@ function SortableRow({ ticket, movableSprints, allSprints, onView, onMoveToSprin
   );
 }
 
-export default function BacklogView() {
+export default function BacklogView({ initialTicketId = null } = {}) {
   const searchParams = useSearchParams();
   const [tickets, setTickets] = useState([]);
   const [total, setTotal] = useState(0);
@@ -130,7 +130,7 @@ export default function BacklogView() {
   const [sprints, setSprints] = useState([]);
   const [labels, setLabels] = useState([]);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [selectedTicketId, setSelectedTicketId] = useState(null);
+  const [selectedTicketId, setSelectedTicketId] = useState(initialTicketId);
   const [filters, setFilters] = useState({});
   const [sort, setSort] = useState({ by: 'number', dir: 'desc' });
   const [scope, setScope] = useState('all');
@@ -172,7 +172,7 @@ export default function BacklogView() {
 
   useEffect(() => {
     const ticketParam = searchParams.get('ticket');
-    if (ticketParam) setSelectedTicketId(parseInt(ticketParam, 10));
+    if (ticketParam) setSelectedTicketId(ticketParam);
     fetchTickets(0);
     apiFetch('/api/users').then((r) => r.json()).then((d) => setUsers(d.users || []));
     apiFetch('/api/sprints').then((r) => r.json()).then((d) => setSprints(d.sprints || []));
