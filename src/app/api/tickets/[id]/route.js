@@ -468,7 +468,14 @@ export const PATCH = withAuth(async (request, user, context) => {
   // the actor. Moves into In Review / Done are not pinged.
   if (nextStatus !== existing.status) {
     const SILENT_STATUSES = new Set(['in_review', 'done']);
-    if (!SILENT_STATUSES.has(nextStatus)) {
+    const movedFromBacklogToNonActiveSprint =
+      existing.status === 'backlog' &&
+      nextStatus === 'todo' &&
+      'sprint_id' in body &&
+      (body.sprint_id || null) !== (existing.sprint_id || null) &&
+      db.prepare("SELECT 1 FROM sprints WHERE id = ? AND status != 'active'").get(body.sprint_id || null);
+
+    if (!SILENT_STATUSES.has(nextStatus) && !movedFromBacklogToNonActiveSprint) {
       const pings = ticketStakeholderDiscordIds(id, { excludeUserId: user.id });
       if (pings.length) {
         notifyStatusChanged(getTicketById(db, id), {

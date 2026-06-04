@@ -75,15 +75,18 @@ export const POST = withAuth(async (request, user, context) => {
   publish({ kind: 'comment', ticket_id: ticketId });
 
   const pings = ticketStakeholderDiscordIds(ticketId, { excludeUserId: user.id, mentionsForCommentId: id });
-  if (pings.length) {
-    // Direct @mentions always ping; stakeholders/watchers are subject to the debounce.
-    const mentionDiscordIds = mentionedUserIds.size
-      ? db.prepare(
-          `SELECT discord_id FROM users WHERE id IN (${[...mentionedUserIds].map(() => '?').join(',')}) AND discord_id IS NOT NULL`
-        ).all(...mentionedUserIds).map((r) => r.discord_id)
-      : [];
-    notifyComment(getTicketById(db, ticketId), { actorName: user.username, body: content.trim(), pingDiscordIds: pings, mentionDiscordIds });
-  }
+  // Direct @mentions always ping; stakeholders/watchers are subject to the debounce.
+  const mentionDiscordIds = mentionedUserIds.size
+    ? db.prepare(
+        `SELECT discord_id FROM users WHERE id IN (${[...mentionedUserIds].map(() => '?').join(',')}) AND discord_id IS NOT NULL`
+      ).all(...mentionedUserIds).map((r) => r.discord_id)
+    : [];
+  notifyComment(getTicketById(db, ticketId), {
+    actorName: user.username,
+    body: content.trim(),
+    pingDiscordIds: pings,
+    mentionDiscordIds,
+  });
 
   return NextResponse.json({ comment }, { status: 201 });
 });
