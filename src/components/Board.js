@@ -133,9 +133,9 @@ function BoardListView({ tickets, visibleColumns, onOpenTicket }) {
   ].filter((group) => group.tickets.length > 0);
 
   return (
-    <div className="space-y-12">
+    <div className="board-list-groups">
       {groups.map((group) => (
-        <section key={group.key} className="space-y-3">
+        <section key={group.key} className="board-list-group">
           <div className="flex items-center gap-2 pl-2">
             <span className={`flex items-center justify-center w-6 h-6 rounded-md priority-group-icon-${group.key}`}>
               <group.Icon weight="bold" className="w-3.5 h-3.5" />
@@ -690,14 +690,16 @@ export default function Board({ sprintId, currentUser }) {
       )}
 
       {boardMode === 'list' ? (
-        <BoardListView
-          tickets={[...visibleTickets].sort((a, b) => {
-            const statusOrder = STATUSES.findIndex((status) => status.value === a.status) - STATUSES.findIndex((status) => status.value === b.status);
-            return statusOrder || sortTickets(a, b);
-          })}
-          visibleColumns={visibleColumns}
-          onOpenTicket={(ticketId) => openTicket(ticketId)}
-        />
+        <div className="board-list-container">
+          <BoardListView
+            tickets={[...visibleTickets].sort((a, b) => {
+              const statusOrder = STATUSES.findIndex((status) => status.value === a.status) - STATUSES.findIndex((status) => status.value === b.status);
+              return statusOrder || sortTickets(a, b);
+            })}
+            visibleColumns={visibleColumns}
+            onOpenTicket={(ticketId) => openTicket(ticketId)}
+          />
+        </div>
       ) : (
         <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           {swimlane !== 'none' ? (

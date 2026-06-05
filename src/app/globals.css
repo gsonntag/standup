@@ -5953,7 +5953,7 @@ body:has(.page-board) {
   gap: 0.75rem;
   min-height: 0;
   overflow-x: auto !important;
-  overflow-y: hidden !important;
+  overflow-y: auto !important;
 }
 
 .board-shell-swimlanes .swimlane {
@@ -6219,6 +6219,26 @@ body:has(.page-board) {
 
 .board-shell-list {
   gap: 0.75rem;
+}
+
+.board-list-container {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+  padding-bottom: 2rem;
+}
+
+.board-list-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 3.5rem; /* larger gap between priority sections */
+}
+
+.board-list-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem; /* gap between group header and the table */
 }
 
 .board-columns-menu[data-slot="dropdown-menu-content"] {
@@ -7036,7 +7056,7 @@ html[data-theme="dark"] .label {
 .board-shell-swimlanes .swimlanes {
   grid-auto-rows: minmax(18rem, 1fr);
   overflow-x: auto !important;
-  overflow-y: hidden !important;
+  overflow-y: auto !important;
 }
 
 .board-shell-swimlanes .swimlane {

@@ -7,6 +7,9 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 export const metadata = {
   title: 'Standup',
   description: 'Sprint planning tool',
+  icons: {
+    icon: '/la-hacks-logo.png',
+  },
 };
 
 export default async function RootLayout({ children }) {
