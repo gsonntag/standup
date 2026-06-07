@@ -102,7 +102,7 @@ function StatusGroupHeader({ status, tickets }) {
 function BoardListView({ tickets, visibleColumns, onOpenTicket }) {
   if (!tickets || tickets.length === 0) {
     return (
-      <div className="board-list-empty text-center py-12 text-muted-foreground font-medium bg-card/20 rounded-xl border border-border/40">
+      <div className="board-list-empty text-center py-12 text-muted-foreground font-medium">
         No issues in this view.
       </div>
     );
@@ -142,15 +142,15 @@ function BoardListView({ tickets, visibleColumns, onOpenTicket }) {
             </span>
             <h3 className="text-xs font-bold uppercase tracking-wider text-foreground/80 flex items-center gap-2">
               {group.label}
-              <span className="text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full font-medium">
+              <span className="board-list-group-count">
                 {group.tickets.length} {group.tickets.length === 1 ? 'issue' : 'issues'}
               </span>
             </h3>
           </div>
 
-          <div className="rounded-xl border border-border/60 bg-card/40 overflow-hidden shadow-sm">
+          <div className="board-list-table-wrap">
             <Table>
-              <TableHeader className="bg-muted/40">
+              <TableHeader>
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="w-20 font-semibold text-muted-foreground text-xs uppercase tracking-wider pl-6">ID</TableHead>
                   <TableHead className="font-semibold text-muted-foreground text-xs uppercase tracking-wider">Title</TableHead>
@@ -185,7 +185,7 @@ function BoardListView({ tickets, visibleColumns, onOpenTicket }) {
                   return (
                     <TableRow
                       key={ticket.id}
-                      className="cursor-pointer transition-colors hover:bg-muted/30 group border-b border-border/40"
+                      className="board-list-row cursor-pointer group"
                       onClick={() => onOpenTicket(ticket.id)}
                     >
                       <TableCell className="font-mono text-xs font-semibold text-muted-foreground/80 pl-6">
@@ -589,12 +589,14 @@ export default function Board({ sprintId, currentUser }) {
 
   return (
     <div className={`board-shell${swimlane !== 'none' && boardMode === 'board' ? ' board-shell-swimlanes' : ''}${boardMode === 'list' ? ' board-shell-list' : ''}`}>
-      <div className="board-toolbar" style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-        <div className="btn-group">
+      <div className="board-toolbar">
+        <div className="btn-group relative">
+          <div className={`toggle-slider ${view === 'mine' ? 'slide-right' : ''}`} />
           <Button type="button" size="sm" variant={view === 'all' ? 'default' : 'outline'} onClick={() => setView('all')}>Whole Sprint</Button>
           <Button type="button" size="sm" variant={view === 'mine' ? 'default' : 'outline'} onClick={() => setView('mine')}>My Tickets</Button>
         </div>
-        <div className="linear-view-switch">
+        <div className="linear-view-switch relative">
+          <div className={`toggle-slider ${boardMode === 'board' ? 'slide-right' : ''}`} />
           <Button type="button" size="sm" variant={boardMode === 'list' ? 'default' : 'outline'} onClick={() => setBoardMode('list')}>
             <ListBulletsIcon weight="bold" />
             List

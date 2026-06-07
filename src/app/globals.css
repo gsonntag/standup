@@ -394,7 +394,8 @@ tr:not([data-slot="table-row"]):last-child td:not([data-slot="table-cell"]) { bo
 tr:not([data-slot="table-row"]):hover td:not([data-slot="table-cell"]) { background: var(--bg-alt); }
 .role-select { width: 110px; }
 .backlog-table { table-layout: fixed; min-width: 960px; }
-.backlog-title-col { width: 360px; }
+.backlog-title-col,
+.ticket-title-col { width: 360px; min-width: 280px; }
 .backlog-title-cell { width: 100%; }
 .backlog-title-button:not([data-slot="button"]) {
   display: block;
@@ -8938,5 +8939,2217 @@ html[data-theme="dark"] .teammate-card-item:hover {
 
   .my-tasks-summary-grid {
     grid-template-columns: 1fr !important;
+  }
+}
+
+/* ─── DEVELOPER MINIMALISTIC OVERHAUL (Linear, Cursor & ElevenLabs Aesthetic) ─── */
+
+/* 1. Global Theme Variables & Layout Reset */
+:root {
+  --ds-bg: #fafbfc;
+  --ds-surface: #ffffff;
+  --ds-surface-raised: #ffffff;
+  --ds-surface-subtle: #fafbfc;
+  --ds-border: #ebebeb;
+  --ds-border-strong: #d9d9d9;
+  --ds-text: #17181c;
+  --ds-text-muted: #62646c;
+  --ds-text-subtle: #8a8d98;
+  --ds-radius: 6px;
+  --ds-radius-lg: 8px;
+  --ds-shadow: none;
+  --ds-shadow-raised: none;
+  --border: #ebebeb;
+  --bg: #ffffff;
+  --bg-alt: #fafbfc;
+  --bg-hover: #f0f1f4;
+  
+  /* Standardized Font Family: System Stack */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+  --font: var(--font-sans) !important;
+  --font-display: var(--font-sans) !important;
+}
+
+html[data-theme="light"] {
+  --linear-canvas: #fafbfc;
+  --linear-surface-1: #ffffff;
+  --linear-surface-2: #fafbfc;
+  --linear-surface-3: #f0f1f4;
+  --linear-hairline: #ebebeb;
+  --linear-hairline-strong: #d9d9d9;
+  --linear-shadow: none;
+  --ds-bg: #fafbfc;
+  --ds-surface: #ffffff;
+  --ds-surface-raised: #ffffff;
+  --ds-surface-subtle: #fafbfc;
+  --ds-border: #ebebeb;
+  --ds-border-strong: #d9d9d9;
+  --ds-shadow: none;
+}
+
+html[data-theme="dark"] {
+  --ds-bg: #010102 !important;
+  --ds-surface: #0f1011 !important;
+  --ds-surface-raised: #141618 !important;
+  --ds-surface-subtle: #0f1011 !important;
+  --ds-border: #1d1e22 !important;
+  --ds-border-strong: #2c2d33 !important;
+  --ds-text: #f3f4f6 !important;
+  --ds-text-muted: #9aa0a6 !important;
+  --ds-text-subtle: #686d73 !important;
+  --ds-shadow: none !important;
+  --ds-shadow-raised: none !important;
+
+  --linear-canvas: #010102 !important;
+  --linear-surface-1: #0f1011 !important;
+  --linear-surface-2: #141618 !important;
+  --linear-surface-3: #1a1c1e !important;
+  --linear-hairline: #1d1e22 !important;
+  --linear-hairline-strong: #2c2d33 !important;
+  --bg: #010102 !important;
+  --bg-alt: #0f1011 !important;
+  --bg-hover: #141618 !important;
+  --border: #1d1e22 !important;
+  --text: #f3f4f6 !important;
+  --text-muted: #9aa0a6 !important;
+}
+
+/* Enforce Global Fonts, sizing and letter spacing */
+body, html, button, input, select, textarea {
+  font-family: var(--font) !important;
+  letter-spacing: -0.015em !important;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font) !important;
+  letter-spacing: -0.020em !important;
+}
+
+/* Remove glowing/radial backgrounds and shadows */
+html, body, .app-layout {
+  background: var(--ds-bg) !important;
+}
+
+/* 2. App Sidebar Redesign */
+.app-sidebar {
+  background: var(--ds-surface) !important;
+  border-right: 1px solid var(--ds-border) !important;
+}
+
+.app-sidebar .navbar-links a.active,
+.sidebar-secondary a.active {
+  background: var(--bg-hover) !important;
+  color: var(--ds-text) !important;
+  border-radius: var(--ds-radius) !important;
+  font-weight: 500 !important;
+  border-left: none !important;
+}
+
+.app-sidebar .navbar-links a.active::before,
+.sidebar-secondary a.active::before {
+  display: none !important;
+}
+
+html[data-theme="dark"] .app-sidebar .navbar-links a.active,
+html[data-theme="dark"] .sidebar-secondary a.active {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #ffffff !important;
+}
+
+/* 3. Solid Flat Panels (No Glassmorphism) */
+.ds-card,
+.dashboard-summary-card,
+.dashboard-table-card,
+.ds-card.glass {
+  background: var(--ds-surface) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: 1px solid var(--ds-border) !important;
+  box-shadow: none !important;
+  border-radius: var(--ds-radius-lg) !important;
+  transform: none !important;
+  transition: border-color 0.15s ease !important;
+}
+
+/* No Interactive translation offsets */
+a.ds-card.glass:hover,
+button.ds-card.glass:hover,
+[role="button"].ds-card.glass:hover,
+.ds-card.glass.interactive:hover {
+  transform: none !important;
+  border-color: var(--ds-border-strong) !important;
+  box-shadow: none !important;
+}
+
+.ds-card.glass::before {
+  display: none !important;
+}
+
+/* 4. Crisp Outlined Form Inputs & Select Triggers */
+input[type="text"],
+input[type="password"],
+input[type="date"],
+input[type="search"],
+input[type="number"],
+textarea,
+select,
+[data-slot="select-trigger"],
+[data-slot="input"],
+[data-slot="textarea"] {
+  font-family: var(--font) !important;
+  background: var(--ds-surface) !important;
+  border: 1px solid var(--ds-border) !important;
+  border-radius: var(--ds-radius) !important;
+  color: var(--ds-text) !important;
+  box-shadow: none !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+}
+
+input:focus,
+textarea:focus,
+select:focus,
+[data-slot="select-trigger"]:focus,
+[data-slot="input"]:focus {
+  border-color: var(--linear-primary) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 1px var(--linear-primary) !important;
+}
+
+/* 5. Outlined Buttons & High-Contrast Primary Buttons */
+.btn,
+button,
+[data-slot="button"] {
+  border-radius: var(--ds-radius) !important;
+  border: 1px solid var(--ds-border) !important;
+  background: var(--ds-surface) !important;
+  color: var(--ds-text) !important;
+  font-weight: 500 !important;
+  box-shadow: none !important;
+  transition: background 0.15s ease, border-color 0.15s ease !important;
+}
+
+.btn:hover,
+button:hover,
+[data-slot="button"]:hover {
+  background: var(--bg-hover) !important;
+  border-color: var(--ds-border-strong) !important;
+}
+
+/* High-Contrast Primary Buttons */
+.btn-primary,
+.tickets-new-button,
+.create-ticket-submit,
+.comment-submit-button,
+[data-variant="default"] {
+  background: #111318 !important;
+  border-color: #111318 !important;
+  color: #ffffff !important;
+}
+
+.btn-primary:hover,
+.tickets-new-button:hover,
+.create-ticket-submit:hover,
+.comment-submit-button:hover,
+[data-variant="default"]:hover {
+  background: #232730 !important;
+  border-color: #232730 !important;
+}
+
+html[data-theme="dark"] .btn-primary,
+html[data-theme="dark"] .tickets-new-button,
+html[data-theme="dark"] .create-ticket-submit,
+html[data-theme="dark"] .comment-submit-button,
+html[data-theme="dark"] [data-variant="default"] {
+  background: #ffffff !important;
+  border-color: #ffffff !important;
+  color: #111318 !important;
+}
+
+html[data-theme="dark"] .btn-primary:hover,
+html[data-theme="dark"] .tickets-new-button:hover,
+html[data-theme="dark"] .create-ticket-submit:hover,
+html[data-theme="dark"] .comment-submit-button:hover,
+html[data-theme="dark"] [data-variant="default"]:hover {
+  background: #f0f0f0 !important;
+  border-color: #f0f0f0 !important;
+}
+
+/* 6. Sliding Toggle Switch Controls */
+.board-toolbar {
+  padding: 0.75rem 0 !important;
+}
+
+.btn-group,
+.linear-view-switch {
+  position: relative !important;
+  display: inline-flex !important;
+  background: var(--bg-alt) !important;
+  border: 1px solid var(--ds-border) !important;
+  border-radius: var(--ds-radius) !important;
+  padding: 2px !important;
+  gap: 2px !important;
+}
+
+html[data-theme="dark"] .btn-group,
+html[data-theme="dark"] .linear-view-switch {
+  background: #141618 !important;
+}
+
+.toggle-slider {
+  position: absolute !important;
+  top: 2px !important;
+  left: 2px !important;
+  width: calc(50% - 3px) !important;
+  height: calc(100% - 4px) !important;
+  border-radius: calc(var(--ds-radius) - 2px) !important;
+  background: var(--linear-primary, #5e6ad2) !important;
+  border: none !important;
+  z-index: 1 !important;
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  box-shadow: 0 1px 3px rgba(94, 106, 210, 0.35) !important;
+}
+
+html[data-theme="dark"] .toggle-slider {
+  background: var(--linear-primary, #5e6ad2) !important;
+  border: none !important;
+  box-shadow: 0 1px 4px rgba(94, 106, 210, 0.4) !important;
+}
+
+.toggle-slider.slide-right {
+  transform: translateX(calc(100% + 2px)) !important;
+}
+
+/* Inactive options inside switch */
+html[data-theme] .btn-group button,
+html[data-theme] .btn-group [data-slot="button"],
+html[data-theme] .linear-view-switch button,
+html[data-theme] .linear-view-switch [data-slot="button"] {
+  position: relative !important;
+  z-index: 2 !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: var(--ds-text-muted) !important;
+  font-weight: 500 !important;
+  height: 1.65rem !important;
+  font-size: 11px !important;
+  padding: 0 0.75rem !important;
+  cursor: pointer !important;
+  transition: color 0.15s ease !important;
+}
+
+html[data-theme] .btn-group button:hover,
+html[data-theme] .btn-group [data-slot="button"]:hover,
+html[data-theme] .linear-view-switch button:hover,
+html[data-theme] .linear-view-switch [data-slot="button"]:hover {
+  color: var(--ds-text) !important;
+}
+
+/* Active option inside switch — white text on solid brand fill */
+html[data-theme] .btn-group button[data-variant="default"],
+html[data-theme] .btn-group [data-variant="default"],
+html[data-theme] .linear-view-switch button[data-variant="default"],
+html[data-theme] .linear-view-switch [data-variant="default"] {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: #ffffff !important;
+}
+
+/* Active option SVGs also white */
+html[data-theme] .btn-group [data-variant="default"] svg,
+html[data-theme] .linear-view-switch [data-variant="default"] svg {
+  color: #ffffff !important;
+  fill: #ffffff !important;
+}
+
+/* Custom size/styling for standalone toolbar buttons & select triggers */
+.board-toolbar select,
+.board-toolbar [data-slot="select-trigger"],
+.board-toolbar .linear-icon-control {
+  height: 1.85rem !important;
+  font-size: 11px !important;
+  padding: 0 0.5rem !important;
+  background: var(--ds-surface) !important;
+  border: 1px solid var(--ds-border) !important;
+}
+
+/* 7. Tabs Sub-navigation */
+html[data-theme] .ticket-detail-tabs-list[data-slot="tabs-list"],
+.ticket-detail-tabs-list[data-slot="tabs-list"] {
+  border: none !important;
+  background: transparent !important;
+  border-bottom: 1px solid var(--ds-border) !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  gap: 1.25rem !important;
+}
+
+html[data-theme] .ticket-detail-tabs-list [data-slot="tabs-trigger"],
+.ticket-detail-tabs-list [data-slot="tabs-trigger"] {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  border-bottom: 2px solid transparent !important;
+  padding: 0.5rem 0 !important;
+  color: var(--ds-text-muted) !important;
+  font-weight: 500 !important;
+}
+
+html[data-theme] .ticket-detail-tabs-list [data-slot="tabs-trigger"][data-state="active"],
+.ticket-detail-tabs-list [data-slot="tabs-trigger"][data-state="active"] {
+  color: var(--ds-text) !important;
+  border-bottom-color: var(--linear-primary) !important;
+}
+
+/* 8. Rectangular Badges, Status & Priority Chips */
+[data-slot="badge"],
+.badge,
+.label,
+.linear-label,
+.status-badge,
+.priority-badge,
+.ticket-card-number,
+.sprint-time-progress-bar {
+  border-radius: 4px !important;
+  font-weight: 500 !important;
+  font-size: 10px !important;
+  letter-spacing: 0.020em !important;
+  text-transform: uppercase !important;
+}
+
+/* Exclude colored badges from global grey/dark theme overrides */
+html[data-theme="light"] [data-slot="badge"]:not(.label):not(.status-badge):not(.priority-badge) {
+  background: #f0f1f4 !important;
+  color: #17181c !important;
+  border: 1px solid #d9d9d9 !important;
+}
+
+html[data-theme="dark"] [data-slot="badge"]:not(.label):not(.status-badge):not(.priority-badge) {
+  background: #1a1c1e !important;
+  color: #f3f4f6 !important;
+  border: 1px solid #2c2d33 !important;
+}
+
+/* Custom Status Badges styling */
+.status-badge[data-status="done"],
+.status-badge.done {
+  background: rgba(16, 185, 129, 0.1) !important;
+  color: #10b981 !important;
+  border: 1px solid rgba(16, 185, 129, 0.2) !important;
+}
+
+.status-badge[data-status="todo"],
+.status-badge.todo {
+  background: rgba(59, 130, 246, 0.1) !important;
+  color: #3b82f6 !important;
+  border: 1px solid rgba(59, 130, 246, 0.2) !important;
+}
+
+.status-badge[data-status="in-progress"],
+.status-badge.in-progress {
+  background: rgba(245, 158, 11, 0.1) !important;
+  color: #f59e0b !important;
+  border: 1px solid rgba(245, 158, 11, 0.2) !important;
+}
+
+.status-badge[data-status="in-review"],
+.status-badge.in-review {
+  background: rgba(139, 92, 246, 0.1) !important;
+  color: #8b5cf6 !important;
+  border: 1px solid rgba(139, 92, 246, 0.2) !important;
+}
+
+.status-badge[data-status="backlog"],
+.status-badge.backlog {
+  background: var(--bg-hover) !important;
+  color: var(--ds-text-muted) !important;
+  border: 1px solid var(--ds-border) !important;
+}
+
+/* Ensure labels inside details modal remain colored */
+.label[style*="--label-color"],
+.linear-label[style*="--label-color"] {
+  background: color-mix(in srgb, var(--label-color) 10%, transparent) !important;
+  color: var(--label-color) !important;
+  border: 1px solid color-mix(in srgb, var(--label-color) 20%, transparent) !important;
+}
+
+/* ─── 9. KILL ALL REMAINING GLASSMORPHISM ─── */
+
+/* Remove every last backdrop-filter in the stylesheet */
+[data-slot="dialog-overlay"] {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background: rgba(0, 0, 0, 0.55) !important;
+}
+
+html[data-theme="light"] [data-slot="dialog-overlay"] {
+  background: rgba(0, 0, 0, 0.25) !important;
+}
+
+/* Dashboard tab container — flat, no blur */
+.dashboard-tabs-container {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background: var(--bg-alt) !important;
+  border: 1px solid var(--ds-border) !important;
+  border-radius: var(--ds-radius) !important;
+  padding: 3px !important;
+}
+
+html[data-theme="dark"] .dashboard-tabs-container {
+  background: #141618 !important;
+  border-color: var(--ds-border) !important;
+}
+
+/* Dashboard tab buttons — match board toggle style */
+.dashboard-tab-btn {
+  border-radius: calc(var(--ds-radius) - 2px) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  padding: 0.375rem 0.875rem !important;
+  color: var(--ds-text-muted) !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  transition: color 0.15s ease, background 0.15s ease !important;
+}
+
+.dashboard-tab-btn:hover {
+  color: var(--ds-text) !important;
+  background: var(--bg-hover) !important;
+}
+
+.dashboard-tab-btn.active {
+  background: var(--linear-primary, #5e6ad2) !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="light"] .dashboard-tab-btn.active {
+  background: var(--linear-primary, #5e6ad2) !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+}
+
+/* ─── 10. FLATTEN ALL REMAINING SHADOWS ─── */
+.ds-card,
+.ds-card.glass,
+.dashboard-summary-card,
+.dashboard-table-card,
+.dashboard-empty-card,
+.team-table-card,
+.team-form-card,
+.team-notice-card,
+.my-task-summary-card,
+.my-tasks-panel,
+.sprint-card,
+.retro-column,
+.ticket-detail-section,
+.ticket-property-card,
+[data-slot="card"] {
+  box-shadow: none !important;
+}
+
+/* All dialog/modal overlays — flat solid surface */
+[data-slot="dialog-content"],
+.modal,
+.create-ticket-dialog[data-slot="dialog-content"],
+.ticket-detail-dialog-modern[data-slot="dialog-content"],
+.sprint-dialog[data-slot="dialog-content"],
+.sprint-complete-dialog[data-slot="dialog-content"] {
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08) !important;
+  border: 1px solid var(--ds-border) !important;
+  background: var(--ds-surface) !important;
+  border-radius: var(--ds-radius-lg) !important;
+}
+
+html[data-theme="dark"] [data-slot="dialog-content"],
+html[data-theme="dark"] .modal {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* ─── 11. FLATTEN DROPDOWN & POPOVER OVERLAYS ─── */
+[data-slot="popover-content"],
+[data-slot="dropdown-menu-content"],
+[data-slot="select-content"],
+.search-dropdown,
+.label-picker-dropdown,
+.mention-dropdown {
+  border: 1px solid var(--ds-border) !important;
+  background: var(--ds-surface) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06) !important;
+  border-radius: var(--ds-radius) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html[data-theme="dark"] [data-slot="popover-content"],
+html[data-theme="dark"] [data-slot="dropdown-menu-content"],
+html[data-theme="dark"] [data-slot="select-content"] {
+  background: var(--ds-surface-raised) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Select/dropdown items hover */
+[data-slot="select-item"],
+[data-slot="dropdown-menu-item"],
+.search-result,
+.label-picker-item,
+.mention-option {
+  border-radius: calc(var(--ds-radius) - 2px) !important;
+}
+
+[data-slot="select-item"]:hover,
+[data-slot="select-item"][data-highlighted],
+[data-slot="dropdown-menu-item"]:hover,
+[data-slot="dropdown-menu-item"][data-highlighted],
+.search-result:hover,
+.search-result.selected {
+  background: var(--bg-hover) !important;
+}
+
+/* ─── 12. CONVERT ALL 999px PILLS TO 4px RECTANGLES ─── */
+.label,
+.priority,
+.ticket-card-assignee,
+.avatar-dot,
+.ds-avatar,
+.ticket-card-avatar {
+  border-radius: 4px !important;
+}
+
+/* Dashboard tab container also */
+.dashboard-tabs-container {
+  border-radius: var(--ds-radius) !important;
+}
+
+/* ─── 13. PAGE HEADER EYEBROW REFINEMENT ─── */
+.app-page-eyebrow {
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.06em !important;
+  text-transform: uppercase !important;
+  color: var(--ds-text-subtle) !important;
+}
+
+.app-page-copy h1,
+.page h1 {
+  font-size: 20px !important;
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
+  color: var(--ds-text) !important;
+}
+
+.app-page-copy p {
+  font-size: 12px !important;
+  color: var(--ds-text-muted) !important;
+}
+
+/* ─── 14. KANBAN COLUMN HEADERS ─── */
+.board-column {
+  background: transparent !important;
+  border: none !important;
+}
+
+.board-column-header,
+.board-column-header[data-slot="card-header"],
+.board-shell .board-column-header[data-slot="card-header"] {
+  background: var(--ds-surface-subtle) !important;
+  border: 1px solid var(--ds-border) !important;
+  border-radius: var(--ds-radius) !important;
+  padding: 0.5rem 0.75rem !important;
+  margin-bottom: 0.5rem !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.04em !important;
+  color: var(--ds-text-muted) !important;
+}
+
+.board-column-count {
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  background: var(--bg-hover) !important;
+  padding: 1px 6px !important;
+  border-radius: 4px !important;
+  color: var(--ds-text-subtle) !important;
+  border: 1px solid var(--ds-border) !important;
+}
+
+/* ─── 15. TICKET CARDS ─── */
+.ticket-card,
+.ticket-card[data-slot="card"] {
+  background: var(--ds-surface) !important;
+  border: 1px solid var(--ds-border) !important;
+  border-radius: var(--ds-radius) !important;
+  box-shadow: none !important;
+  transition: border-color 0.15s ease !important;
+}
+
+.ticket-card:hover,
+.ticket-card[data-slot="card"]:hover {
+  border-color: var(--ds-border-strong) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.ticket-card-number {
+  font-family: var(--font-mono) !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  color: var(--ds-text-subtle) !important;
+}
+
+/* ─── 16. NEUTRAL AVATARS ─── */
+.ticket-card-assignee,
+.avatar-dot,
+.ds-avatar,
+.ticket-card-avatar {
+  background: var(--bg-hover) !important;
+  color: var(--ds-text-muted) !important;
+  border: 1px solid var(--ds-border) !important;
+}
+
+/* ─── 17. EMPTY STATES ─── */
+.board-empty .board-column-empty,
+.board-column-empty {
+  border: 1px dashed var(--ds-border) !important;
+  border-radius: var(--ds-radius) !important;
+  background: transparent !important;
+}
+
+.board-empty-banner {
+  background: var(--ds-surface) !important;
+  border: 1px solid var(--ds-border) !important;
+  border-radius: var(--ds-radius-lg) !important;
+  box-shadow: none !important;
+  color: var(--ds-text-muted) !important;
+}
+
+/* ─── 18. ICON BADGES (unified subtle style) ─── */
+.app-page-icon,
+.ds-section-icon,
+.ds-stat-icon,
+.my-task-summary-icon,
+.retro-column-icon,
+.sprint-card-icon {
+  border: 1px solid var(--ds-border) !important;
+  color: var(--ds-text-muted) !important;
+  background: var(--ds-surface-subtle) !important;
+  border-radius: var(--ds-radius) !important;
+}
+
+/* ─── 19. DATE PILL ─── */
+.linear-date-pill,
+.dashboard-sprint-meta {
+  border-radius: var(--ds-radius) !important;
+  background: var(--ds-surface) !important;
+  border: 1px solid var(--ds-border) !important;
+  box-shadow: none !important;
+  font-size: 12px !important;
+}
+
+/* ─── 20. BACKLOG ACTION BAR & SEARCH ─── */
+.tickets-action-bar {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+.tickets-search-control {
+  background: var(--ds-surface) !important;
+  border: 1px solid var(--ds-border) !important;
+  border-radius: var(--ds-radius) !important;
+}
+
+/* ─── 21. SPRINT CARDS ─── */
+.sprint-card[data-slot="card"] {
+  background: var(--ds-surface) !important;
+  border: 1px solid var(--ds-border) !important;
+  border-radius: var(--ds-radius-lg) !important;
+  box-shadow: none !important;
+}
+
+/* ─── 22. PROGRESS BARS ─── */
+.sprint-time-progress-bar {
+  border-radius: 4px !important;
+}
+
+/* ─── 23. TABLE STYLING ─── */
+[data-slot="table-container"],
+.table-container {
+  border: 1px solid var(--ds-border) !important;
+  border-radius: var(--ds-radius) !important;
+  background: var(--ds-surface) !important;
+  box-shadow: none !important;
+}
+
+[data-slot="table-head"] {
+  color: var(--ds-text-subtle) !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.04em !important;
+}
+
+/* ─── 24. LINK/ANCHOR COLOR CLEANUP ─── */
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: none;
+}
+
+/* ─── 25. UNIFIED SEGMENT CONTROLS & CONSISTENT PADDING ─── */
+
+:root {
+  --ds-segment-pad: 2px;
+  --ds-segment-gap: 2px;
+  --ds-segment-height: 1.75rem;
+  --ds-segment-x: 0.75rem;
+  --ds-segment-font: 11px;
+  --ds-active-fill: var(--linear-primary, #5e6ad2);
+  --ds-active-text: #ffffff;
+}
+
+/* Flat toolbar — no card chrome */
+.board-toolbar,
+.filter-bar,
+.tickets-action-bar {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  gap: 0.75rem !important;
+  padding: 0.75rem 0 !important;
+  margin-bottom: 1rem !important;
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.board-toolbar > .btn-group:first-child {
+  margin-right: auto !important;
+}
+
+/* Shared segment shell */
+.btn-group,
+.linear-view-switch,
+.scope-toggle.btn-group,
+.dashboard-topnav-tabs,
+.dashboard-tabs-container {
+  position: relative !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: var(--ds-segment-gap) !important;
+  padding: var(--ds-segment-pad) !important;
+  background: var(--bg-alt) !important;
+  border: 1px solid var(--ds-border) !important;
+  border-radius: var(--ds-radius) !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="dark"] .btn-group,
+html[data-theme="dark"] .linear-view-switch,
+html[data-theme="dark"] .scope-toggle.btn-group,
+html[data-theme="dark"] .dashboard-topnav-tabs,
+html[data-theme="dark"] .dashboard-tabs-container {
+  background: #141618 !important;
+}
+
+/* Kill legacy pill / asymmetric scope-toggle chrome */
+.scope-toggle::before {
+  display: none !important;
+}
+
+.scope-toggle.btn-group {
+  display: inline-flex !important;
+  grid-template-columns: none !important;
+}
+
+/* Solid sliding fill — flat, no glow */
+.toggle-slider {
+  background: var(--ds-active-fill) !important;
+  border: none !important;
+  box-shadow: none !important;
+  top: var(--ds-segment-pad) !important;
+  left: var(--ds-segment-pad) !important;
+  width: calc(50% - calc(var(--ds-segment-pad) + var(--ds-segment-gap) / 2)) !important;
+  height: calc(100% - calc(var(--ds-segment-pad) * 2)) !important;
+  border-radius: calc(var(--ds-radius) - 2px) !important;
+}
+
+.toggle-slider.slide-right {
+  transform: translateX(calc(100% + var(--ds-segment-gap))) !important;
+}
+
+/* Equal-width segments so the sliding fill aligns */
+.btn-group > [data-slot="button"],
+.btn-group > button,
+.linear-view-switch > [data-slot="button"],
+.linear-view-switch > button,
+.scope-toggle.btn-group > [data-slot="button"],
+.scope-toggle.btn-group > button {
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
+}
+
+/* Segment buttons — consistent sizing */
+html[data-theme] .btn-group button,
+html[data-theme] .btn-group [data-slot="button"],
+html[data-theme] .linear-view-switch button,
+html[data-theme] .linear-view-switch [data-slot="button"],
+html[data-theme] .scope-toggle.btn-group button,
+html[data-theme] .scope-toggle.btn-group [data-slot="button"],
+.dashboard-topnav-tab,
+.dashboard-tab-btn {
+  position: relative !important;
+  z-index: 2 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: var(--ds-segment-height) !important;
+  height: var(--ds-segment-height) !important;
+  padding: 0 var(--ds-segment-x) !important;
+  font-size: var(--ds-segment-font) !important;
+  font-weight: 500 !important;
+  line-height: 1 !important;
+  border: none !important;
+  border-radius: calc(var(--ds-radius) - 2px) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--ds-text-muted) !important;
+  cursor: pointer !important;
+  transition: color 0.15s ease !important;
+  white-space: nowrap !important;
+}
+
+html[data-theme] .btn-group button:hover,
+html[data-theme] .btn-group [data-slot="button"]:hover,
+html[data-theme] .linear-view-switch button:hover,
+html[data-theme] .linear-view-switch [data-slot="button"]:hover,
+html[data-theme] .scope-toggle.btn-group button:hover,
+html[data-theme] .scope-toggle.btn-group [data-slot="button"]:hover,
+.dashboard-topnav-tab:hover,
+.dashboard-tab-btn:hover {
+  background: transparent !important;
+  color: var(--ds-text) !important;
+}
+
+/* Active segment — text on solid fill (slider provides the fill) */
+html[data-theme] .btn-group button[data-variant="default"],
+html[data-theme] .btn-group [data-variant="default"],
+html[data-theme] .linear-view-switch button[data-variant="default"],
+html[data-theme] .linear-view-switch [data-variant="default"],
+html[data-theme] .scope-toggle.btn-group button[data-variant="default"],
+html[data-theme] .scope-toggle.btn-group [data-variant="default"] {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: var(--ds-active-text) !important;
+}
+
+html[data-theme] .btn-group [data-variant="default"] svg,
+html[data-theme] .linear-view-switch [data-variant="default"] svg,
+html[data-theme] .scope-toggle.btn-group [data-variant="default"] svg {
+  color: var(--ds-active-text) !important;
+}
+
+/* Tabs without slider — direct solid fill on active */
+.dashboard-topnav-tab.active,
+.dashboard-tab-btn.active {
+  background: var(--ds-active-fill) !important;
+  color: var(--ds-active-text) !important;
+  border-bottom: none !important;
+  box-shadow: none !important;
+}
+
+.dashboard-topnav {
+  border-bottom: none !important;
+  margin-bottom: 1.5rem !important;
+  padding-bottom: 0 !important;
+}
+
+.dashboard-topnav-tabs {
+  flex-wrap: wrap !important;
+}
+
+.dashboard-topnav-meta {
+  padding-bottom: 0 !important;
+}
+
+/* Toolbar utilities match segment height */
+.board-toolbar select,
+.board-toolbar [data-slot="select-trigger"],
+.board-toolbar .linear-icon-control,
+.board-toolbar > [data-slot="button"]:not(.btn-group [data-slot="button"]):not(.linear-view-switch [data-slot="button"]) {
+  min-height: calc(var(--ds-segment-height) + calc(var(--ds-segment-pad) * 2)) !important;
+  height: calc(var(--ds-segment-height) + calc(var(--ds-segment-pad) * 2)) !important;
+  font-size: var(--ds-segment-font) !important;
+  padding: 0 var(--ds-segment-x) !important;
+  background: var(--ds-surface) !important;
+  border: 1px solid var(--ds-border) !important;
+  border-radius: var(--ds-radius) !important;
+  box-shadow: none !important;
+}
+
+.board-toolbar .linear-icon-control {
+  width: calc(var(--ds-segment-height) + calc(var(--ds-segment-pad) * 2)) !important;
+  min-width: calc(var(--ds-segment-height) + calc(var(--ds-segment-pad) * 2)) !important;
+  padding: 0 !important;
+}
+
+/* Sidebar active — solid tinted fill */
+.app-sidebar .navbar-links a,
+.sidebar-secondary a {
+  padding: 0.5rem 0.75rem !important;
+  min-height: 2rem !important;
+  border-radius: var(--ds-radius) !important;
+}
+
+.app-sidebar .navbar-links a.active,
+.sidebar-secondary a.active {
+  background: #eef0ff !important;
+  color: var(--ds-active-fill) !important;
+  font-weight: 600 !important;
+}
+
+html[data-theme="dark"] .app-sidebar .navbar-links a.active,
+html[data-theme="dark"] .sidebar-secondary a.active {
+  background: #1e2030 !important;
+  color: #a5b0ff !important;
+}
+
+/* Ticket detail tabs — solid underline replaced with flat active text */
+html[data-theme] .ticket-detail-tabs-list [data-slot="tabs-trigger"][data-state="active"],
+.ticket-detail-tabs-list [data-slot="tabs-trigger"][data-state="active"] {
+  color: var(--ds-active-fill) !important;
+  border-bottom-color: var(--ds-active-fill) !important;
+}
+
+/* Board list view — flat tables */
+.board-list-group {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.board-list-group-count {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.5rem;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ds-text-muted);
+  background: var(--bg-hover);
+  border: 1px solid var(--ds-border);
+  border-radius: 4px;
+}
+
+.board-list-table-wrap {
+  overflow: hidden;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius);
+  background: var(--ds-surface);
+}
+
+.board-list-table-wrap [data-slot="table-header"] {
+  background: var(--ds-surface-subtle);
+}
+
+.board-list-row[data-slot="table-row"]:hover {
+  background: var(--bg-hover) !important;
+}
+
+.board-list-empty {
+  border: 1px dashed var(--ds-border);
+  border-radius: var(--ds-radius);
+  background: transparent;
+}
+
+/* Status badges — solid fills (underscore class names used in board list) */
+.status-badge-backlog[data-slot="badge"],
+.status-badge-backlog {
+  background: #f0f1f4 !important;
+  color: #62646c !important;
+  border: 1px solid #d9d9d9 !important;
+}
+
+.status-badge-todo[data-slot="badge"],
+.status-badge-todo {
+  background: #dbeafe !important;
+  color: #1d4ed8 !important;
+  border: 1px solid #93c5fd !important;
+}
+
+.status-badge-in_progress[data-slot="badge"],
+.status-badge-in_progress {
+  background: #fef3c7 !important;
+  color: #b45309 !important;
+  border: 1px solid #fcd34d !important;
+}
+
+.status-badge-in_review[data-slot="badge"],
+.status-badge-in_review {
+  background: #ede9fe !important;
+  color: #6d28d9 !important;
+  border: 1px solid #c4b5fd !important;
+}
+
+.status-badge-done[data-slot="badge"],
+.status-badge-done {
+  background: #d1fae5 !important;
+  color: #047857 !important;
+  border: 1px solid #6ee7b7 !important;
+}
+
+html[data-theme="dark"] .status-badge-backlog[data-slot="badge"],
+html[data-theme="dark"] .status-badge-backlog {
+  background: #1a1c1e !important;
+  color: #9aa0a6 !important;
+  border-color: #2c2d33 !important;
+}
+
+html[data-theme="dark"] .status-badge-todo[data-slot="badge"],
+html[data-theme="dark"] .status-badge-todo {
+  background: #172554 !important;
+  color: #93c5fd !important;
+  border-color: #1e3a8a !important;
+}
+
+html[data-theme="dark"] .status-badge-in_progress[data-slot="badge"],
+html[data-theme="dark"] .status-badge-in_progress {
+  background: #422006 !important;
+  color: #fcd34d !important;
+  border-color: #78350f !important;
+}
+
+html[data-theme="dark"] .status-badge-in_review[data-slot="badge"],
+html[data-theme="dark"] .status-badge-in_review {
+  background: #2e1065 !important;
+  color: #c4b5fd !important;
+  border-color: #4c1d95 !important;
+}
+
+html[data-theme="dark"] .status-badge-done[data-slot="badge"],
+html[data-theme="dark"] .status-badge-done {
+  background: #052e16 !important;
+  color: #6ee7b7 !important;
+  border-color: #065f46 !important;
+}
+
+/* ─── 26. TYPOGRAPHY, NAV & TICKETS TABLE (Mobbin-style) ─── */
+
+:root {
+  --ds-text: #0a0a0a;
+  --ds-text-muted: #5c5c5c;
+  --ds-text-subtle: #8a8a8a;
+  --ds-active-text-color: var(--linear-primary, #5e6ad2);
+}
+
+html[data-theme="light"] {
+  --text: #0a0a0a;
+  --linear-ink: #0a0a0a;
+  --linear-ink-muted: #5c5c5c;
+  --linear-ink-subtle: #8a8a8a;
+}
+
+html[data-theme="light"] body,
+html[data-theme="light"] .page {
+  color: #0a0a0a !important;
+}
+
+html[data-theme="dark"] body,
+html[data-theme="dark"] .page {
+  color: #f3f4f6 !important;
+}
+
+/* No underline on interactive hovers */
+a:hover,
+button:hover,
+[data-slot="button"]:hover,
+.app-sidebar .navbar-links a:hover,
+.sidebar-secondary a:hover,
+.sidebar-theme-toggle:hover,
+.ticket-sort-header:hover {
+  text-decoration: none !important;
+}
+
+/* Sidebar: black default, purple active */
+.app-sidebar .navbar-links a,
+.sidebar-secondary a,
+.sidebar-theme-toggle {
+  color: #0a0a0a !important;
+  text-decoration: none !important;
+}
+
+html[data-theme="dark"] .app-sidebar .navbar-links a,
+html[data-theme="dark"] .sidebar-secondary a,
+html[data-theme="dark"] .sidebar-theme-toggle {
+  color: #e8e8e8 !important;
+}
+
+.app-sidebar .navbar-links a:hover,
+.sidebar-secondary a:hover,
+.sidebar-theme-toggle:hover {
+  color: #0a0a0a !important;
+  background: var(--bg-hover) !important;
+}
+
+html[data-theme="dark"] .app-sidebar .navbar-links a:hover,
+html[data-theme="dark"] .sidebar-secondary a:hover,
+html[data-theme="dark"] .sidebar-theme-toggle:hover {
+  color: #ffffff !important;
+}
+
+.app-sidebar .navbar-links a.active,
+.sidebar-secondary a.active {
+  color: var(--ds-active-text-color) !important;
+}
+
+/* Buttons: black text, never underline */
+[data-slot="button"],
+button {
+  text-decoration: none !important;
+}
+
+[data-slot="button"]:hover,
+button:hover {
+  text-decoration: none !important;
+}
+
+/* ── Tickets table (Mobbin / Linear-style) ── */
+
+.table-container:has(.backlog-table) {
+  border: 1px solid var(--ds-border) !important;
+  border-radius: var(--ds-radius) !important;
+  background: var(--ds-surface) !important;
+  overflow: hidden !important;
+  box-shadow: none !important;
+}
+
+.backlog-table[data-slot="table"] {
+  min-width: 1000px;
+}
+
+.backlog-table [data-slot="table-header"] [data-slot="table-row"] {
+  background: #f6f6f7 !important;
+  border-bottom: 1px solid var(--ds-border) !important;
+}
+
+html[data-theme="dark"] .backlog-table [data-slot="table-header"] [data-slot="table-row"] {
+  background: #141618 !important;
+}
+
+.backlog-table [data-slot="table-head"] {
+  height: auto !important;
+  padding: 0.5rem 1rem !important;
+  color: #5c5c5c !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  text-transform: none !important;
+  letter-spacing: normal !important;
+  white-space: nowrap;
+  vertical-align: middle;
+  border-bottom: none !important;
+}
+
+html[data-theme="dark"] .backlog-table [data-slot="table-head"] {
+  color: #9aa0a6 !important;
+}
+
+.backlog-table .ticket-sort-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  width: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 500;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: none !important;
+}
+
+.backlog-table .ticket-sort-header svg {
+  width: 0.75rem;
+  height: 0.75rem;
+  color: #8a8a8a;
+  opacity: 1;
+}
+
+.backlog-table .ticket-sort-header:hover {
+  color: #0a0a0a !important;
+  text-decoration: none !important;
+}
+
+html[data-theme="dark"] .backlog-table .ticket-sort-header:hover {
+  color: #f3f4f6 !important;
+}
+
+.backlog-table .ticket-sort-header.active {
+  color: var(--ds-active-text-color) !important;
+  font-weight: 500;
+}
+
+.backlog-table .ticket-sort-header.active svg {
+  color: var(--ds-active-text-color) !important;
+}
+
+/* Ticket rows — vertically centered single-line cells; labels may wrap */
+.backlog-table .ticket-row[data-slot="table-row"] {
+  cursor: pointer;
+  border-bottom: 1px solid var(--ds-border) !important;
+}
+
+.backlog-table .ticket-row [data-slot="table-cell"] {
+  vertical-align: middle !important;
+  padding-top: 0.5rem !important;
+  padding-bottom: 0.5rem !important;
+  white-space: nowrap;
+}
+
+.backlog-table .ticket-row-drag-cell[data-slot="table-cell"] {
+  text-align: center;
+  vertical-align: middle !important;
+}
+
+.backlog-table .ticket-row-drag-handle[data-slot="button"] {
+  vertical-align: middle;
+}
+
+.backlog-table .ticket-id {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  color: #8a8a8a;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.backlog-table .ticket-title-text {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  color: #0a0a0a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html[data-theme="dark"] .backlog-table .ticket-id {
+  color: #9aa0a6;
+}
+
+html[data-theme="dark"] .backlog-table .ticket-title-text {
+  color: #f3f4f6;
+}
+
+.backlog-table .ticket-row[data-slot="table-row"]:hover .ticket-title-text {
+  color: #0a0a0a !important;
+}
+
+html[data-theme="dark"] .backlog-table .ticket-row[data-slot="table-row"]:hover .ticket-title-text {
+  color: #f3f4f6 !important;
+}
+
+.backlog-table .ticket-priority-cell [data-slot="badge"],
+.backlog-table .ticket-assignee-cell,
+.backlog-table .ticket-sprint-cell {
+  vertical-align: middle !important;
+}
+
+.backlog-table .ticket-labels-cell[data-slot="table-cell"] {
+  white-space: normal !important;
+  vertical-align: middle !important;
+}
+
+.backlog-table .ticket-labels-cell .label-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  align-items: center;
+  align-content: center;
+}
+
+.backlog-table .ticket-action-cell[data-slot="table-cell"] {
+  vertical-align: middle !important;
+}
+
+.backlog-table .ticket-row-select[data-slot="select-trigger"] {
+  height: 1.75rem !important;
+  min-height: 1.75rem !important;
+  font-size: 12px;
+}
+
+.backlog-table .ticket-row[data-slot="table-row"]:hover {
+  background: #fafafa !important;
+}
+
+html[data-theme="dark"] .backlog-table .ticket-row[data-slot="table-row"]:hover {
+  background: #141618 !important;
+}
+
+.backlog-table .ticket-priority-cell,
+.backlog-table .ticket-assignee-cell,
+.backlog-table .ticket-sprint-cell,
+.backlog-table .ticket-action-cell {
+  color: #5c5c5c !important;
+  font-size: 13px;
+}
+
+html[data-theme="dark"] .backlog-table .ticket-priority-cell,
+html[data-theme="dark"] .backlog-table .ticket-assignee-cell,
+html[data-theme="dark"] .backlog-table .ticket-sprint-cell,
+html[data-theme="dark"] .backlog-table .ticket-action-cell {
+  color: #9aa0a6 !important;
+}
+
+.backlog-table .ticket-title-col {
+  min-width: 280px;
+}
+
+/* Segment controls: black default labels */
+html[data-theme="light"] .btn-group [data-slot="button"]:not([data-variant="default"]),
+html[data-theme="light"] .linear-view-switch [data-slot="button"]:not([data-variant="default"]),
+html[data-theme="light"] .scope-toggle.btn-group [data-slot="button"]:not([data-variant="default"]),
+html[data-theme="light"] .dashboard-topnav-tab:not(.active) {
+  color: #0a0a0a !important;
+}
+
+/* ─── 27. TICKETS PAGE — SCOPE TOGGLE & COLUMN FILTERS ─── */
+
+.tickets-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  flex-wrap: wrap;
+}
+
+/* Dedicated scope toggle — isolated from board btn-group */
+.tickets-scope-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 2px;
+  background: var(--bg-alt);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius);
+}
+
+html[data-theme="dark"] .tickets-scope-toggle {
+  background: #141618;
+}
+
+.tickets-scope-toggle::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  z-index: 0;
+  width: calc(50% - 3px);
+  height: calc(100% - 4px);
+  border-radius: calc(var(--ds-radius) - 2px);
+  background: var(--linear-primary, #5e6ad2);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+
+.tickets-scope-toggle[data-active="backlog"]::before {
+  transform: translateX(calc(100% + 2px));
+}
+
+.tickets-scope-toggle button {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 0;
+  min-width: 0;
+  height: 1.75rem;
+  padding: 0 0.875rem;
+  border: none;
+  border-radius: calc(var(--ds-radius) - 2px);
+  background: transparent;
+  color: #0a0a0a;
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  text-decoration: none;
+  box-shadow: none;
+  transition: color 0.15s ease;
+}
+
+html[data-theme="dark"] .tickets-scope-toggle button {
+  color: #e8e8e8;
+}
+
+.tickets-scope-toggle button:hover {
+  text-decoration: none;
+  background: transparent;
+}
+
+.tickets-scope-toggle button.is-active {
+  color: #ffffff;
+}
+
+/* Toolbar above table — Jira-style filters */
+.tickets-table-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+.tickets-table-toolbar .tickets-search-control {
+  flex: 1 1 14rem;
+  min-width: min(100%, 12rem);
+  margin: 0;
+}
+
+.tickets-table-toolbar .tickets-search-input[data-slot="input"] {
+  height: 2rem;
+  font-size: 12px;
+  background: var(--ds-surface);
+  border: 1px solid var(--ds-border);
+}
+
+.tickets-toolbar-filter[data-slot="select-trigger"] {
+  height: 2rem !important;
+  min-height: 2rem !important;
+  min-width: 8.5rem;
+  font-size: 12px;
+  background: var(--ds-surface);
+  border: 1px solid var(--ds-border);
+  box-shadow: none;
+}
+
+/* Jira-style sortable column headers */
+.ticket-table-head-row [data-slot="table-head"] {
+  vertical-align: middle;
+  padding: 0.5rem 0.75rem !important;
+  background: #f6f6f7;
+  border-bottom: 1px solid var(--ds-border);
+}
+
+html[data-theme="dark"] .ticket-table-head-row [data-slot="table-head"] {
+  background: #141618;
+}
+
+.ticket-col-head {
+  font-weight: 400 !important;
+}
+
+.ticket-col-head-checkbox,
+.ticket-col-head-drag {
+  vertical-align: middle !important;
+}
+
+.ticket-col-static {
+  color: #5c5c5c !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  white-space: nowrap;
+}
+
+html[data-theme="dark"] .ticket-col-static {
+  color: #9aa0a6 !important;
+}
+
+/* Sortable headers — plain text, hover tint, click to sort */
+.ticket-col-sortable[data-slot="table-head"] {
+  display: table-cell;
+  cursor: pointer;
+  user-select: none;
+  color: #5c5c5c !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  white-space: nowrap;
+  transition: color 0.12s ease, background 0.12s ease;
+  outline: none;
+}
+
+html[data-theme="dark"] .ticket-col-sortable[data-slot="table-head"] {
+  color: #9aa0a6 !important;
+}
+
+.ticket-col-sortable[data-slot="table-head"]:hover {
+  color: #0a0a0a !important;
+  background: #eeeff1 !important;
+}
+
+html[data-theme="dark"] .ticket-col-sortable[data-slot="table-head"]:hover {
+  color: #f3f4f6 !important;
+  background: #1a1c1e !important;
+}
+
+.ticket-col-sortable.is-sorted[data-slot="table-head"] {
+  color: var(--linear-primary, #5e6ad2) !important;
+}
+
+.ticket-col-sortable.is-sorted[data-slot="table-head"]:hover {
+  color: var(--linear-primary, #5e6ad2) !important;
+  background: #eeeff1 !important;
+}
+
+html[data-theme="dark"] .ticket-col-sortable.is-sorted[data-slot="table-head"]:hover {
+  background: #1a1c1e !important;
+}
+
+.ticket-col-sort-label {
+  display: inline;
+  font: inherit;
+  color: inherit;
+}
+
+.ticket-sort-icon {
+  display: inline-block;
+  width: 0.7rem;
+  height: 0.7rem;
+  margin-left: 0.2rem;
+  vertical-align: -0.1em;
+  flex-shrink: 0;
+}
+
+.ticket-sort-icon.is-hint {
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.ticket-col-sortable:hover .ticket-sort-icon.is-hint,
+.ticket-col-sortable:focus-visible .ticket-sort-icon.is-hint {
+  opacity: 0.45;
+}
+
+.ticket-sort-icon.is-active {
+  opacity: 1;
+  color: var(--linear-primary, #5e6ad2);
+}
+
+.ticket-col-sortable:focus-visible {
+  outline: 2px solid var(--linear-primary, #5e6ad2);
+  outline-offset: -2px;
+}
+
+/* Tickets column — # + title on one line */
+.backlog-table .ticket-issue-cell[data-slot="table-cell"] {
+  min-width: 16rem;
+  max-width: 0;
+  vertical-align: middle !important;
+  white-space: nowrap;
+}
+
+.backlog-table .ticket-issue-inner {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.backlog-table .ticket-issue-col {
+  min-width: 16rem;
+}
+
+/* Tickets header scope toggle — roomier padding, asymmetric columns */
+.tickets-header-actions .tickets-scope-group {
+  display: inline-grid !important;
+  grid-template-columns: 4.5rem 8.5rem !important;
+  gap: 2px !important;
+  padding: 3px !important;
+  align-items: stretch !important;
+}
+
+.tickets-header-actions .tickets-scope-group > [data-slot="button"] {
+  flex: none !important;
+  min-width: 0 !important;
+  width: 100% !important;
+  height: 2rem !important;
+  min-height: 2rem !important;
+  padding: 0 0.875rem !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+}
+
+.tickets-header-actions .tickets-scope-group .toggle-slider {
+  width: 4.5rem !important;
+  top: 3px !important;
+  left: 3px !important;
+  height: calc(100% - 6px) !important;
+}
+
+.tickets-header-actions .tickets-scope-group .toggle-slider.slide-right {
+  transform: translateX(calc(4.5rem + 2px)) !important;
+  width: 8.5rem !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   28. Sprints · My Tasks · Dashboard · Team — flat Mobbin-style pages
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Shared flat data tables (my-tasks, team, dashboard) */
+.flat-data-table[data-slot="table"] {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.flat-data-table .ticket-row[data-slot="table-row"] {
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.flat-data-table .ticket-row[data-slot="table-row"]:hover {
+  background: #f6f6f7 !important;
+}
+
+html[data-theme="dark"] .flat-data-table .ticket-row[data-slot="table-row"]:hover {
+  background: #1a1c1e !important;
+}
+
+.flat-data-table [data-slot="table-cell"] {
+  vertical-align: middle !important;
+  padding: 0.625rem 0.75rem !important;
+  border-bottom: 1px solid var(--ds-border);
+  font-size: 13px;
+}
+
+.flat-data-table [data-slot="table-footer"] [data-slot="table-cell"] {
+  background: #f6f6f7;
+  font-weight: 600;
+  border-top: 1px solid var(--ds-border);
+}
+
+html[data-theme="dark"] .flat-data-table [data-slot="table-footer"] [data-slot="table-cell"] {
+  background: #141618;
+}
+
+/* Flat ticket rows (dashboard lists, my-tasks mentions/blockers) */
+.flat-ticket-list {
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius);
+  overflow: hidden;
+  background: var(--ds-surface);
+}
+
+.ticket-row-flat {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--ds-border);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: background 0.12s ease;
+}
+
+.ticket-row-flat:last-child {
+  border-bottom: none;
+}
+
+.ticket-row-flat:hover,
+.ticket-row-flat:focus-visible {
+  background: #f6f6f7;
+  outline: none;
+}
+
+html[data-theme="dark"] .ticket-row-flat:hover,
+html[data-theme="dark"] .ticket-row-flat:focus-visible {
+  background: #1a1c1e;
+}
+
+.my-task-list .ticket-row-flat {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.dashboard-ticket-row.ticket-row-flat {
+  grid-template-columns: minmax(0, 1.6fr) auto auto auto;
+}
+
+.dashboard-ticket-meta {
+  font-size: 12px;
+  color: #5c5c5c;
+  white-space: nowrap;
+}
+
+html[data-theme="dark"] .dashboard-ticket-meta {
+  color: #9aa0a6;
+}
+
+.dashboard-ticket-meta-danger {
+  color: #c9372c !important;
+  font-weight: 600;
+}
+
+/* ── Sprints ── */
+.sprint-summary-grid {
+  gap: 0.625rem;
+  margin-bottom: 1.25rem;
+}
+
+.sprint-summary-card {
+  min-height: 3.5rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius);
+  background: var(--ds-surface);
+  box-shadow: none !important;
+}
+
+.sprint-summary-card span {
+  color: var(--ds-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.sprint-summary-card strong {
+  color: var(--ds-text);
+  font-size: 1.375rem;
+  font-weight: 700;
+}
+
+.sprint-card.ds-card[data-slot="card"] {
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius);
+  background: var(--ds-surface);
+  box-shadow: none !important;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.sprint-card.ds-card[data-slot="card"]:hover {
+  border-color: #c8c8cc;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="dark"] .sprint-card.ds-card[data-slot="card"]:hover {
+  border-color: #3a3d42;
+}
+
+.sprint-card-active.ds-card[data-slot="card"] {
+  border-color: var(--linear-primary, #5e6ad2);
+  background: color-mix(in srgb, var(--linear-primary, #5e6ad2) 4%, var(--ds-surface));
+  box-shadow: none !important;
+}
+
+.sprint-card-header[data-slot="card-header"] {
+  padding: 1rem 1.125rem 0.75rem !important;
+}
+
+.sprint-card [data-slot="card-content"] {
+  padding: 0 1.125rem 1rem !important;
+}
+
+.sprint-card-icon {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--linear-primary, #5e6ad2) 12%, transparent);
+  color: var(--linear-primary, #5e6ad2);
+}
+
+.sprint-card-completed .sprint-card-icon {
+  color: #1f845a;
+  background: color-mix(in srgb, #1f845a 12%, transparent);
+}
+
+.sprint-card-planning .sprint-card-icon {
+  color: var(--ds-text-muted);
+  background: var(--bg-alt);
+}
+
+.sprint-status-badge[data-slot="badge"] {
+  height: 1.5rem;
+  padding: 0 0.5rem;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: capitalize;
+  border-radius: 4px;
+  box-shadow: none;
+}
+
+.sprint-progress-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--bg-alt);
+}
+
+.sprint-progress-track span {
+  border-radius: 2px;
+  background: var(--linear-primary, #5e6ad2);
+  min-width: 0;
+}
+
+.sprint-card-completed .sprint-progress-track span {
+  background: #1f845a;
+}
+
+.sprint-metric {
+  min-height: 1.75rem;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--ds-border);
+  border-radius: 4px;
+  background: var(--ds-surface);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ds-text-muted);
+}
+
+.sprint-card-actions {
+  gap: 0.375rem;
+  margin-top: 0.875rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--ds-border);
+}
+
+.sprint-ticket-list {
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius);
+  background: var(--ds-surface);
+}
+
+.sprint-ticket-option {
+  border: none;
+  border-bottom: 1px solid var(--ds-border);
+  border-radius: 0;
+  padding: 0.5rem 0.625rem;
+  background: transparent;
+}
+
+.sprint-ticket-option:last-child {
+  border-bottom: none;
+}
+
+.sprint-ticket-option:hover {
+  background: #f6f6f7;
+}
+
+html[data-theme="dark"] .sprint-ticket-option:hover {
+  background: #1a1c1e;
+}
+
+/* ── My Tasks ── */
+.my-tasks-page .my-tasks-summary-grid {
+  gap: 0.625rem;
+  margin-bottom: 1.25rem;
+}
+
+.my-task-summary-card.ds-card[data-slot="card"] {
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius);
+  background: var(--ds-surface);
+  box-shadow: none !important;
+}
+
+.my-task-summary-card [data-slot="card-content"] {
+  padding: 0.75rem 1rem !important;
+}
+
+.my-task-summary-icon {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 6px;
+  font-size: 0;
+}
+
+.my-tasks-tabbar {
+  margin-bottom: 1rem;
+}
+
+.my-tasks-content {
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius);
+  background: var(--ds-surface);
+  overflow: hidden;
+}
+
+.my-tasks-content .table-container {
+  border: none;
+  border-radius: 0;
+}
+
+.my-tasks-empty {
+  min-height: 10rem;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  font-size: 13px;
+}
+
+.my-task-list {
+  gap: 0;
+}
+
+.my-task-list-item {
+  border: none;
+  border-bottom: 1px solid var(--ds-border);
+  border-radius: 0;
+  padding: 0.5rem 0.75rem;
+  background: transparent;
+}
+
+.my-task-list-item:last-child {
+  border-bottom: none;
+}
+
+.my-task-list-item:hover {
+  background: #f6f6f7;
+}
+
+html[data-theme="dark"] .my-task-list-item:hover {
+  background: #1a1c1e;
+}
+
+.my-task-list-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 4px;
+}
+
+/* ── Dashboard ── */
+.dashboard-sprint-select[data-slot="select-trigger"] {
+  height: 2rem;
+  min-height: 2rem;
+  font-size: 12px;
+  background: var(--ds-surface);
+  border: 1px solid var(--ds-border);
+  box-shadow: none;
+}
+
+.dashboard-topnav {
+  margin-bottom: 1.25rem;
+}
+
+.dashboard-empty-card.ds-card[data-slot="card"] {
+  border: 1px dashed var(--ds-border);
+  background: transparent;
+  box-shadow: none !important;
+}
+
+.dashboard-empty-card [data-slot="card-content"] {
+  padding: 2rem 1.5rem !important;
+  text-align: center;
+  color: var(--ds-text-muted);
+  font-size: 13px;
+}
+
+.bento-overview .ds-card[data-slot="card"],
+.dashboard-summary-card.ds-card[data-slot="card"] {
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius);
+  background: var(--ds-surface);
+  box-shadow: none !important;
+}
+
+.dashboard-summary-card [data-slot="card-header"] {
+  padding: 0.875rem 1rem 0.5rem !important;
+}
+
+.dashboard-summary-card [data-slot="card-content"] {
+  padding: 0 1rem 1rem !important;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.ds-stat-icon {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 6px;
+}
+
+.sprint-timeline-row {
+  margin-bottom: 1rem;
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius);
+  background: var(--ds-surface);
+}
+
+.sprint-timeline-bar-wrap .sprint-time-progress-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--bg-alt);
+}
+
+.sprint-time-progress-fill {
+  border-radius: 2px;
+  background: var(--linear-primary, #5e6ad2);
+}
+
+.teammate-workload-grid {
+  gap: 0.625rem;
+}
+
+.teammate-card-item {
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius);
+  background: var(--ds-surface);
+  box-shadow: none !important;
+  transition: border-color 0.12s ease;
+}
+
+.teammate-card-item:hover {
+  border-color: #c8c8cc;
+}
+
+html[data-theme="dark"] .teammate-card-item:hover {
+  border-color: #3a3d42;
+}
+
+.teammate-avatar {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.dashboard-team-table-wrap {
+  padding-top: 1.25rem;
+  margin-top: 1.25rem;
+  border-top: 1px solid var(--ds-border);
+}
+
+.dashboard-ticket-list.flat-ticket-list {
+  border: none;
+  border-radius: 0;
+}
+
+.dashboard-empty-inline {
+  border: none;
+  border-radius: 0;
+  padding: 2rem 1rem;
+  background: transparent;
+}
+
+.dashboard-status-strip span {
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius);
+  background: var(--ds-surface);
+  box-shadow: none;
+}
+
+.workload-progress-track {
+  border-radius: 2px;
+  background: var(--bg-alt);
+}
+
+/* ── Team ── */
+.team-table-card.ds-card[data-slot="card"],
+.team-form-card.ds-card[data-slot="card"],
+.team-notice-card[data-slot="card"] {
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius);
+  background: var(--ds-surface);
+  box-shadow: none !important;
+}
+
+.team-table-card [data-slot="card-header"] {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.875rem 1rem 0.625rem !important;
+  border-bottom: 1px solid var(--ds-border);
+}
+
+.team-table-card [data-slot="card-title"] {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.team-table-card [data-slot="card-content"] {
+  padding: 0 !important;
+}
+
+.team-table-card .table-container {
+  border: none;
+  border-radius: 0;
+}
+
+.team-role-select[data-slot="select-trigger"] {
+  height: 1.75rem;
+  min-height: 1.75rem;
+  font-size: 12px;
+  box-shadow: none;
+}
+
+.team-discord-input[data-slot="input"] {
+  height: 1.75rem;
+  font-size: 12px;
+}
+
+.team-notice-card [data-slot="card-content"] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem !important;
+  font-size: 13px;
+}
+
+.team-form-card [data-slot="card-content"] {
+  padding: 1rem !important;
+}
+
+.team-repo-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  color: inherit;
+  text-decoration: none;
+}
+
+.team-repo-link:hover {
+  color: var(--linear-primary, #5e6ad2);
+  text-decoration: none;
+}
+
+@media (max-width: 900px) {
+  .my-tasks-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-ticket-row.ticket-row-flat {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .dashboard-ticket-row.ticket-row-flat .dashboard-ticket-meta,
+  .dashboard-ticket-row.ticket-row-flat [data-slot="badge"] {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+
+@media (max-width: 640px) {
+  .sprint-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .my-tasks-summary-grid {
+    grid-template-columns: 1fr 1fr;
   }
 }

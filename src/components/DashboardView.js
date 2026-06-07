@@ -54,25 +54,35 @@ function DashboardTicketList({ tickets, emptyText, showDue = false, showBlockers
   }
 
   return (
-    <div className="dashboard-ticket-list">
+    <div className="dashboard-ticket-list flat-ticket-list">
       {tickets.map((ticket) => (
         <div
           key={ticket.id}
-          className="dashboard-ticket-row cursor-pointer transition-colors"
+          className="dashboard-ticket-row ticket-row-flat"
           onClick={() => onTicketClick(ticket.id)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onTicketClick(ticket.id);
+            }
+          }}
         >
-          <span className="text-mono">#{ticket.number}</span>
-          <strong>{ticket.title}</strong>
+          <div className="ticket-issue-inner">
+            <span className="ticket-id">#{ticket.number}</span>
+            <span className="ticket-title-text">{ticket.title}</span>
+          </div>
           <Badge className={`status-badge status-badge-${ticket.status}`} variant="outline">
             {ticket.status.replaceAll('_', ' ')}
           </Badge>
-          {showDue && ticket.due_date && <span className="linear-muted-chip">Due {formatDashboardDate(ticket.due_date)}</span>}
+          {showDue && ticket.due_date && <span className="dashboard-ticket-meta">Due {formatDashboardDate(ticket.due_date)}</span>}
           {showBlockers && ticket.unresolved_blocker_count > 0 && (
-            <span className="linear-muted-chip text-red-400 border-red-500/20 bg-red-500/5">
+            <span className="dashboard-ticket-meta dashboard-ticket-meta-danger">
               {ticket.unresolved_blocker_count} blocker{ticket.unresolved_blocker_count === 1 ? '' : 's'}
             </span>
           )}
-          <span className="text-muted">{assigneeLabel(ticket)}</span>
+          <span className="dashboard-ticket-meta text-muted">{assigneeLabel(ticket)}</span>
         </div>
       ))}
     </div>
@@ -775,7 +785,7 @@ export default function DashboardView() {
       />
 
       {!sprintId && !loading && (
-        <Card className="dashboard-empty-card ds-card glass">
+        <Card className="dashboard-empty-card ds-card">
           <CardContent>No sprints yet. Create one on the Sprints page.</CardContent>
         </Card>
       )}
@@ -830,13 +840,13 @@ export default function DashboardView() {
               )}
 
               <div className="bento-row-top">
-                <Card className="ds-card glass bento-health flex flex-col justify-center items-center py-8">
+                <Card className="ds-card bento-health flex flex-col justify-center items-center py-8">
                   <SprintHealthGauge score={healthScore} />
                 </Card>
 
                 <div className="bento-stats">
                   {summaryCards.map(({ label, value, icon: Icon, tone }) => (
-                    <Card className="dashboard-summary-card ds-card glass" data-tone={tone} key={label}>
+                    <Card className="dashboard-summary-card ds-card" data-tone={tone} key={label}>
                       <CardHeader>
                         <span className="ds-stat-icon">
                           <Icon weight="bold" />
@@ -850,7 +860,7 @@ export default function DashboardView() {
               </div>
 
               <div className="bento-row-bottom">
-                <Card className="ds-card glass">
+                <Card className="ds-card">
                   <CardHeader>
                     <span className="ds-section-icon">
                       <TargetIcon weight="bold" />
@@ -874,7 +884,7 @@ export default function DashboardView() {
                   </CardContent>
                 </Card>
 
-                <Card className="ds-card glass">
+                <Card className="ds-card">
                   <CardHeader>
                     <span className="ds-section-icon">
                       <FireIcon weight="bold" />
@@ -965,7 +975,7 @@ export default function DashboardView() {
 
           {activeTab === 'active_work' && (
             <div className="space-y-8">
-              <Card className="ds-card glass">
+              <Card className="ds-card">
                 <CardHeader>
                   <span className="ds-section-icon">
                     <LightningIcon weight="bold" />
@@ -983,7 +993,7 @@ export default function DashboardView() {
               </Card>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <Card className="ds-card glass">
+                <Card className="ds-card">
                   <CardHeader>
                     <span className="ds-section-icon text-red-400">
                       <WarningIcon weight="bold" />
@@ -1001,7 +1011,7 @@ export default function DashboardView() {
                   </CardContent>
                 </Card>
 
-                <Card className="ds-card glass">
+                <Card className="ds-card">
                   <CardHeader>
                     <span className="ds-section-icon text-amber-500">
                       <PushPinIcon weight="bold" />
@@ -1022,7 +1032,7 @@ export default function DashboardView() {
           )}
 
           {activeTab === 'team' && (
-            <Card className="ds-card glass">
+            <Card className="ds-card">
               <CardHeader>
                 <span className="ds-section-icon">
                   <UsersThreeIcon weight="bold" />
@@ -1086,21 +1096,22 @@ export default function DashboardView() {
                   </div>
                 </div>
 
-                <div className="border-t border-border/60 pt-6 mt-6 overflow-x-auto">
-                  <Table className="dashboard-table min-w-full">
+                <div className="dashboard-team-table-wrap">
+                  <div className="table-container">
+                  <Table className="dashboard-table flat-data-table min-w-full">
                     <TableHeader>
-                      <TableRow>
-                        <TableHead>Member</TableHead>
-                        <TableHead>Done</TableHead>
-                        <TableHead>In Progress</TableHead>
-                        <TableHead>PR</TableHead>
-                        <TableHead>Points Done</TableHead>
-                        <TableHead>Total Points</TableHead>
+                      <TableRow className="ticket-table-head-row">
+                        <TableHead className="ticket-col-head ticket-col-static">Member</TableHead>
+                        <TableHead className="ticket-col-head ticket-col-static" style={{ width: 72 }}>Done</TableHead>
+                        <TableHead className="ticket-col-head ticket-col-static" style={{ width: 100 }}>In Progress</TableHead>
+                        <TableHead className="ticket-col-head ticket-col-static" style={{ width: 56 }}>PR</TableHead>
+                        <TableHead className="ticket-col-head ticket-col-static" style={{ width: 100 }}>Points Done</TableHead>
+                        <TableHead className="ticket-col-head ticket-col-static" style={{ width: 100 }}>Total Points</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {members.map((m) => (
-                        <TableRow key={m.id}>
+                        <TableRow key={m.id} className="ticket-row">
                           <TableCell className="font-bold">
                             <span className="ds-person-cell">
                               <span className="ds-avatar">{m.username.slice(0, 2)}</span>
@@ -1135,6 +1146,7 @@ export default function DashboardView() {
                       </TableFooter>
                     )}
                   </Table>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -1142,7 +1154,7 @@ export default function DashboardView() {
 
           {activeTab === 'analytics' && (
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-7 items-start">
-              <Card className="ds-card glass xl:col-span-2">
+              <Card className="ds-card xl:col-span-2">
                 <CardHeader>
                   <span className="ds-section-icon">
                     <ChartBarIcon weight="bold" />
@@ -1154,7 +1166,7 @@ export default function DashboardView() {
                 </CardContent>
               </Card>
 
-              <Card className="ds-card glass">
+              <Card className="ds-card">
                 <CardHeader>
                   <span className="ds-section-icon">
                     <TargetIcon weight="bold" />
@@ -1169,7 +1181,7 @@ export default function DashboardView() {
           )}
 
           {activeTab === 'activity' && (
-            <Card className="ds-card glass">
+            <Card className="ds-card">
               <CardHeader>
                 <span className="ds-section-icon">
                   <ActivityIcon weight="bold" />

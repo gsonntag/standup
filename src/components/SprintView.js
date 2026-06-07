@@ -251,7 +251,7 @@ function SprintCard({ sprint, isAdmin, onAction, onEdit, onCompleteWithRollover 
   const statusVariant = sprint.status === 'active' ? 'default' : sprint.status === 'completed' ? 'secondary' : 'outline';
 
   return (
-    <Card className={`sprint-card sprint-card-${sprint.status}`}>
+    <Card className={`sprint-card ds-card sprint-card-${sprint.status}${sprint.status === 'active' ? ' sprint-card-active' : ''}`}>
       <CardHeader className="sprint-card-header">
         <div className="sprint-card-title-group">
           <div className="sprint-card-icon" aria-hidden="true">

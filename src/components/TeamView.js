@@ -289,21 +289,22 @@ export default function TeamView({ currentUser }) {
           <CardTitle>Members</CardTitle>
         </CardHeader>
         <CardContent>
-        <Table className="team-table">
+        <div className="table-container">
+        <Table className="team-table flat-data-table">
           <TableHeader>
-            <TableRow>
-              <TableHead>Username</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead>Discord</TableHead>
-              <TableHead>Joined</TableHead>
-              <TableHead>Actions</TableHead>
+            <TableRow className="ticket-table-head-row">
+              <TableHead className="ticket-col-head ticket-col-static">Username</TableHead>
+              <TableHead className="ticket-col-head ticket-col-static" style={{ width: 120 }}>Role</TableHead>
+              <TableHead className="ticket-col-head ticket-col-static">Discord</TableHead>
+              <TableHead className="ticket-col-head ticket-col-static" style={{ width: 110 }}>Joined</TableHead>
+              <TableHead className="ticket-col-head ticket-col-static" style={{ width: 200 }}>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {users.map((user) => {
               const canEditDiscord = isAdmin || user.id === currentUser?.id;
               return (
-                <TableRow key={user.id}>
+                <TableRow key={user.id} className="ticket-row">
                   <TableCell className="font-bold">
                     <span className="ds-person-cell"><span className="ds-avatar">{user.username.slice(0, 2)}</span>{user.username}</span>
                   </TableCell>
@@ -396,6 +397,7 @@ export default function TeamView({ currentUser }) {
             {!users.length && <TableRow><TableCell colSpan={5}><div className="empty">No users</div></TableCell></TableRow>}
           </TableBody>
         </Table>
+        </div>
         </CardContent>
       </Card>
       {users.length <= 1 && (
@@ -437,18 +439,19 @@ export default function TeamView({ currentUser }) {
       )}
       <Card className="team-table-card ds-card">
         <CardContent>
-        <Table className="team-table">
+        <div className="table-container">
+        <Table className="team-table flat-data-table">
           <TableHeader>
-            <TableRow>
-              <TableHead>Repository</TableHead>
-              <TableHead>Default Branch</TableHead>
-              <TableHead>Updated</TableHead>
-              {isAdmin && <TableHead>Actions</TableHead>}
+            <TableRow className="ticket-table-head-row">
+              <TableHead className="ticket-col-head ticket-col-static">Repository</TableHead>
+              <TableHead className="ticket-col-head ticket-col-static" style={{ width: 140 }}>Default Branch</TableHead>
+              <TableHead className="ticket-col-head ticket-col-static" style={{ width: 110 }}>Updated</TableHead>
+              {isAdmin && <TableHead className="ticket-col-head ticket-col-static" style={{ width: 120 }}>Actions</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {repositories.map((repo) => (
-              <TableRow key={repo.id}>
+              <TableRow key={repo.id} className="ticket-row">
                 <TableCell className="font-bold">
                   <a className="team-repo-link" href={repo.html_url} target="_blank" rel="noopener noreferrer"><GithubLogoIcon weight="bold" />{repo.full_name}</a>
                 </TableCell>
@@ -468,6 +471,7 @@ export default function TeamView({ currentUser }) {
             )}
           </TableBody>
         </Table>
+        </div>
         </CardContent>
       </Card>
     </div>

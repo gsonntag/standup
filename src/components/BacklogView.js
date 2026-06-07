@@ -13,26 +13,32 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { CaretDownIcon, CaretUpIcon, DotsSixVerticalIcon, PlusIcon, TicketIcon } from '@phosphor-icons/react';
+import { CaretDownIcon, CaretUpIcon, DotsSixVerticalIcon, MagnifyingGlassIcon, PlusIcon, TicketIcon } from '@phosphor-icons/react';
+import { Input } from '@/components/ui/input';
 import AppPageHeader from './AppPageHeader';
 import { AppEmptyState } from './AppUI';
 import CreateTicketForm from './CreateTicketForm';
 import TicketDetail from './TicketDetail';
-import TicketFilterBar from './TicketFilterBar';
 
-function SortHeader({ label, value, sort, onSort, className = '', style }) {
+function SortableColumnHead({ label, value, sort, onSort, className = '', style }) {
   const active = sort.by === value;
   const Icon = active && sort.dir === 'asc' ? CaretUpIcon : CaretDownIcon;
   return (
-    <TableHead className={className} style={style}>
-      <button
-        type="button"
-        className={`ticket-sort-header${active ? ' active' : ''}`}
-        onClick={() => onSort(value)}
-      >
-        {label}
-        <Icon weight="bold" />
-      </button>
+    <TableHead
+      className={`ticket-col-head ticket-col-sortable${active ? ' is-sorted' : ''}${className ? ` ${className}` : ''}`}
+      style={style}
+      onClick={() => onSort(value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSort(value);
+        }
+      }}
+      tabIndex={0}
+      aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+    >
+      <span className="ticket-col-sort-label">{label}</span>
+      <Icon weight="bold" className={active ? 'ticket-sort-icon is-active' : 'ticket-sort-icon is-hint'} />
     </TableHead>
   );
 }
@@ -69,19 +75,19 @@ function SortableRow({ ticket, movableSprints, allSprints, onView, onMoveToSprin
           <DotsSixVerticalIcon weight="bold" />
         </Button>
       </TableCell>
-      <TableCell className="backlog-title-cell">
-        <div className="backlog-row-title">
-          <span className="ticket-number-pill">#{ticket.number}</span>
-          {ticket.title}
+      <TableCell className="ticket-issue-cell">
+        <div className="ticket-issue-inner">
+          <span className="ticket-id">#{ticket.number}</span>
+          <span className="ticket-title-text">{ticket.title}</span>
         </div>
       </TableCell>
-      <TableCell>
+      <TableCell className="ticket-priority-cell">
         <Badge className={`priority-badge priority-badge-${ticket.priority}`} variant="outline">
           {ticket.priority}
         </Badge>
       </TableCell>
-      <TableCell className="text-muted">{ticket.assignee_username || '-'}</TableCell>
-      <TableCell>
+      <TableCell className="ticket-assignee-cell text-muted">{ticket.assignee_username || '—'}</TableCell>
+      <TableCell className="ticket-labels-cell">
         <span className="label-list">
           {ticket.labels?.map((label) => (
             <span key={label.id} className="label" style={labelPillStyle(label.color)}>{label.name}</span>
@@ -89,11 +95,11 @@ function SortableRow({ ticket, movableSprints, allSprints, onView, onMoveToSprin
         </span>
       </TableCell>
       {showSprint && (
-        <TableCell className="text-muted text-xs">
-          {ticket.sprint_id ? (ticket.sprint_name || allSprints.find((s) => String(s.id) === String(ticket.sprint_id))?.name || '—') : <em>Backlog</em>}
+        <TableCell className="ticket-sprint-cell text-muted">
+          {ticket.sprint_id ? (ticket.sprint_name || allSprints.find((s) => String(s.id) === String(ticket.sprint_id))?.name || '—') : 'Backlog'}
         </TableCell>
       )}
-      <TableCell onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
+      <TableCell className="ticket-action-cell" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
         <Select
           disabled={isMoving}
           value={ticket.sprint_id ? String(ticket.sprint_id) : 'backlog'}
@@ -101,7 +107,7 @@ function SortableRow({ ticket, movableSprints, allSprints, onView, onMoveToSprin
             if (value) await onMoveToSprint(ticket.id, value);
           }}
         >
-          <SelectTrigger className="w-40">
+          <SelectTrigger className="ticket-row-select w-40">
             <SelectValue placeholder={isMoving ? 'Moving...' : 'Selected sprint'} />
           </SelectTrigger>
           <SelectContent>
@@ -202,12 +208,6 @@ export default function BacklogView({ initialTicketId = null } = {}) {
         ? (sort.dir === 'asc' ? 'desc' : 'asc')
         : (nextBy === 'priority' || nextBy === 'number' ? 'desc' : 'asc'),
     };
-    setSort(nextSort);
-    setOffset(0);
-    fetchTickets(0, filters, scope, nextSort);
-  }
-
-  function handleSortChange(nextSort) {
     setSort(nextSort);
     setOffset(0);
     fetchTickets(0, filters, scope, nextSort);
@@ -328,25 +328,12 @@ export default function BacklogView({ initialTicketId = null } = {}) {
         subtitle="Triage, assign, and move LA Hacks engineering work."
         actions={(
           <div className="tickets-header-actions">
-          <div className="scope-toggle" data-scope={scope}>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              aria-pressed={scope === 'all'}
-              className="scope-toggle-option"
-              onClick={() => handleScopeChange('all')}
-            >
+          <div className="btn-group tickets-scope-group relative" role="group" aria-label="Ticket scope">
+            <div className={`toggle-slider ${scope === 'backlog' ? 'slide-right' : ''}`} />
+            <Button type="button" size="sm" variant={scope === 'all' ? 'default' : 'outline'} onClick={() => handleScopeChange('all')}>
               All
             </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              aria-pressed={scope === 'backlog'}
-              className="scope-toggle-option"
-              onClick={() => handleScopeChange('backlog')}
-            >
+            <Button type="button" size="sm" variant={scope === 'backlog' ? 'default' : 'outline'} onClick={() => handleScopeChange('backlog')}>
               Backlog only
             </Button>
           </div>
@@ -367,16 +354,74 @@ export default function BacklogView({ initialTicketId = null } = {}) {
           onCancel={() => setShowCreateForm(false)}
         />
       )}
-            <TicketFilterBar
-              filters={filters}
-              onChange={handleFiltersChange}
-              users={users}
-              labels={labels}
-              priorities={PRIORITIES}
-              statuses={STATUSES}
-              sort={sort}
-              onSortChange={handleSortChange}
-            />
+      <div className="tickets-table-toolbar">
+        <div className="tickets-search-control">
+          <MagnifyingGlassIcon weight="bold" aria-hidden="true" />
+          <Input
+            type="search"
+            placeholder="Search tickets or #"
+            value={filters.q || ''}
+            onChange={(e) => handleFiltersChange({ ...filters, q: e.target.value })}
+            className="filter-input tickets-search-input"
+          />
+        </div>
+        <Select
+          value={filters.assignee_id ? String(filters.assignee_id) : 'all'}
+          onValueChange={(value) => handleFiltersChange({ ...filters, assignee_id: value === 'all' ? undefined : value })}
+        >
+          <SelectTrigger className="tickets-toolbar-filter">
+            <SelectValue placeholder="Assignee" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All assignees</SelectItem>
+            {users.map((u) => <SelectItem key={u.id} value={String(u.id)}>{u.username}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select
+          value={filters.priority || 'all'}
+          onValueChange={(value) => handleFiltersChange({ ...filters, priority: value === 'all' ? undefined : value })}
+        >
+          <SelectTrigger className="tickets-toolbar-filter">
+            <SelectValue placeholder="Priority" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All priorities</SelectItem>
+            {PRIORITIES.map((p) => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select
+          value={filters.status || 'open'}
+          onValueChange={(value) => handleFiltersChange({ ...filters, status: value === 'open' ? undefined : value })}
+        >
+          <SelectTrigger className="tickets-toolbar-filter">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="open">Open tickets</SelectItem>
+            {STATUSES.map((status) => (
+              <SelectItem key={status.value} value={status.value}>{status.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {showSprint && (
+          <Select
+            value={filters.sprint_id ? String(filters.sprint_id) : 'all'}
+            onValueChange={(value) => handleFiltersChange({ ...filters, sprint_id: value === 'all' ? undefined : value })}
+          >
+            <SelectTrigger className="tickets-toolbar-filter">
+              <SelectValue placeholder="Sprint" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All sprints</SelectItem>
+              <SelectItem value="none">Backlog</SelectItem>
+              {sprints.map((s) => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
+        {Object.values(filters).some(Boolean) && (
+          <Button type="button" size="sm" variant="outline" onClick={() => handleFiltersChange({})}>Clear filters</Button>
+        )}
+      </div>
       {selected.size > 0 && (
         <div className="bulk-bar">
           <span>{selected.size} selected</span>
@@ -396,20 +441,22 @@ export default function BacklogView({ initialTicketId = null } = {}) {
         <div className="table-container">
           <Table className="backlog-table">
             <TableHeader>
-              <TableRow>
-                <TableHead style={{ width: 36, textAlign: 'center' }}>
+              <TableRow className="ticket-table-head-row">
+                <TableHead className="ticket-col-head ticket-col-head-checkbox" style={{ width: 36, textAlign: 'center' }}>
                   <Checkbox
                     checked={tickets.length > 0 && selected.size === tickets.length}
                     onCheckedChange={toggleSelectAll}
                   />
                 </TableHead>
-                <TableHead style={{ width: 36 }} aria-label="Reorder" />
-                <SortHeader label="Ticket #" value="number" sort={sort} onSort={handleSort} className="backlog-title-col" />
-                <SortHeader label="Priority" value="priority" sort={sort} onSort={handleSort} style={{ width: 120 }} />
-                <SortHeader label="Assignee" value="assignee" sort={sort} onSort={handleSort} style={{ width: 140 }} />
-                <TableHead style={{ width: 180 }}>Labels</TableHead>
-                {showSprint && <SortHeader label="Sprint" value="sprint" sort={sort} onSort={handleSort} style={{ width: 160 }} />}
-                <TableHead style={{ width: 180 }}>Selected sprint</TableHead>
+                <TableHead className="ticket-col-head ticket-col-head-drag" style={{ width: 36 }} aria-label="Reorder" />
+                <SortableColumnHead label="Tickets" value="number" sort={sort} onSort={handleSort} className="ticket-issue-col" />
+                <SortableColumnHead label="Priority" value="priority" sort={sort} onSort={handleSort} style={{ width: 110 }} />
+                <SortableColumnHead label="Assignee" value="assignee" sort={sort} onSort={handleSort} style={{ width: 120 }} />
+                <TableHead className="ticket-col-head ticket-col-static" style={{ width: 160 }}>Labels</TableHead>
+                {showSprint && (
+                  <SortableColumnHead label="Sprint" value="sprint" sort={sort} onSort={handleSort} style={{ width: 150 }} />
+                )}
+                <TableHead className="ticket-col-head ticket-col-static" style={{ width: 180 }}>Move to</TableHead>
               </TableRow>
             </TableHeader>
             <SortableContext items={tickets.map((t) => t.id)} strategy={verticalListSortingStrategy}>
