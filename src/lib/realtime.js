@@ -2,33 +2,61 @@
 
 import { useEffect, useRef } from 'react';
 
+// Shared EventSource connection singleton
+let sharedEventSource = null;
+const listeners = new Set();
+let retryTimeout = null;
+
+function getSharedEventSource() {
+  if (sharedEventSource) return sharedEventSource;
+
+  function connect() {
+    sharedEventSource = new EventSource('/api/events');
+    sharedEventSource.onmessage = (e) => {
+      if (e.data === 'ping') return;
+      try {
+        const event = JSON.parse(e.data);
+        listeners.forEach((listener) => listener(event));
+      } catch (_) {}
+    };
+    sharedEventSource.onerror = () => {
+      if (sharedEventSource) {
+        sharedEventSource.close();
+        sharedEventSource = null;
+      }
+      retryTimeout = setTimeout(connect, 5000);
+    };
+  }
+
+  connect();
+  return sharedEventSource;
+}
+
 export function useRealtime(onEvent) {
   const onEventRef = useRef(onEvent);
   onEventRef.current = onEvent;
 
   useEffect(() => {
-    let es;
-    let retryTimeout;
+    const listener = (event) => {
+      onEventRef.current(event);
+    };
 
-    function connect() {
-      es = new EventSource('/api/events');
-      es.onmessage = (e) => {
-        if (e.data === 'ping') return;
-        try {
-          const event = JSON.parse(e.data);
-          onEventRef.current(event);
-        } catch (_) {}
-      };
-      es.onerror = () => {
-        es.close();
-        retryTimeout = setTimeout(connect, 5000);
-      };
-    }
+    listeners.add(listener);
+    getSharedEventSource();
 
-    connect();
     return () => {
-      es?.close();
-      clearTimeout(retryTimeout);
+      listeners.delete(listener);
+      if (listeners.size === 0) {
+        if (sharedEventSource) {
+          sharedEventSource.close();
+          sharedEventSource = null;
+        }
+        if (retryTimeout) {
+          clearTimeout(retryTimeout);
+          retryTimeout = null;
+        }
+      }
     };
   }, []);
 }
+

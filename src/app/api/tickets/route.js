@@ -127,17 +127,33 @@ export function attachReviewers(db, tickets) {
   }));
 }
 
-function attachGitHubRepositories(tickets) {
+export function attachGitHubRepositories(db, tickets) {
+  if (!tickets.length) return tickets;
+  const ticketIds = tickets.map((ticket) => ticket.id);
+  const placeholders = ticketIds.map(() => '?').join(',');
+  const repoRows = db.prepare(`
+    SELECT tr.ticket_id, gr.id, gr.owner, gr.name, gr.default_branch, gr.html_url
+    FROM ticket_repositories tr
+    JOIN github_repositories gr ON gr.id = tr.repo_id
+    WHERE tr.ticket_id IN (${placeholders})
+    ORDER BY gr.owner ASC, gr.name ASC
+  `).all(...ticketIds);
+  const reposByTicket = new Map();
+  for (const row of repoRows) {
+    if (!reposByTicket.has(row.ticket_id)) reposByTicket.set(row.ticket_id, []);
+    reposByTicket.get(row.ticket_id).push({
+      id: row.id,
+      owner: row.owner,
+      name: row.name,
+      default_branch: row.default_branch,
+      html_url: row.html_url,
+      full_name: `${row.owner}/${row.name}`,
+    });
+  }
   return tickets.map((ticket) => {
-    const githubRepository = ticket.github_repository_id
-      ? {
-          id: ticket.github_repository_id,
-          owner: ticket.github_repository_owner,
-          name: ticket.github_repository_name,
-          default_branch: ticket.github_repository_default_branch,
-          html_url: ticket.github_repository_html_url,
-        }
-      : null;
+    const repos = reposByTicket.get(ticket.id) || [];
+    const githubRepository = repos[0] || null;
+    const githubRepoId = ticket.github_repo_id || githubRepository?.id || null;
     const {
       github_repository_id,
       github_repository_owner,
@@ -146,7 +162,12 @@ function attachGitHubRepositories(tickets) {
       github_repository_html_url,
       ...rest
     } = ticket;
-    return { ...rest, github_repository: githubRepository };
+    return {
+      ...rest,
+      github_repo_id: githubRepoId,
+      github_repository: githubRepository,
+      github_repositories: repos,
+    };
   });
 }
 
@@ -174,7 +195,7 @@ export function getTicketById(db, id) {
     WHERE t.id = ?
   `).get(id);
   if (!ticket) return null;
-  return attachGitHubRepositories(attachLabels(db, attachReviewers(db, attachAssignees(db, [ticket]))))[0];
+  return attachGitHubRepositories(db, attachLabels(db, attachReviewers(db, attachAssignees(db, [ticket]))))[0];
 }
 
 export const GET = withAuth(async (request) => {
@@ -270,7 +291,7 @@ export const GET = withAuth(async (request) => {
     LIMIT ? OFFSET ?
   `).all(...args, limit, offset);
 
-  return NextResponse.json({ tickets: attachGitHubRepositories(attachLabels(db, attachReviewers(db, attachAssignees(db, tickets)))), total });
+  return NextResponse.json({ tickets: attachGitHubRepositories(db, attachLabels(db, attachReviewers(db, attachAssignees(db, tickets)))), total });
 });
 
 export const POST = withAuth(async (request, user) => {
@@ -282,7 +303,8 @@ export const POST = withAuth(async (request, user) => {
   const sprintId = body.sprint_id || null;
   const assigneeIds = normalizeIdList(body.assignee_ids || (body.assignee_id ? [body.assignee_id] : []));
   const assigneeId = assigneeIds[0] || null;
-  const githubRepoId = body.github_repo_id || null;
+  const githubRepoIds = normalizeIdList(body.github_repo_ids || (body.github_repo_id ? [body.github_repo_id] : []));
+  const githubRepoId = githubRepoIds[0] || null;
   const labelIds = normalizeIdList(body.label_ids);
   const watcherIds = normalizeIdList(body.watcher_ids);
   const blockerIds = normalizeIdList(body.blocker_ids);
@@ -324,8 +346,10 @@ export const POST = withAuth(async (request, user) => {
       return jsonError('Assignee not found.', 404);
     }
   }
-  if (githubRepoId && !db.prepare('SELECT id FROM github_repositories WHERE id = ?').get(githubRepoId)) {
-    return jsonError('GitHub repository not found.', 404);
+  for (const repoId of githubRepoIds) {
+    if (!db.prepare('SELECT id FROM github_repositories WHERE id = ?').get(repoId)) {
+      return jsonError('GitHub repository not found.', 404);
+    }
   }
   for (const labelId of labelIds) {
     if (!db.prepare('SELECT id FROM labels WHERE id = ?').get(labelId)) {
@@ -356,6 +380,10 @@ export const POST = withAuth(async (request, user) => {
       )
       VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(id, title, body.description || '', status, priority, sortOrder, sprintId, assigneeId, user.id, totalPoints, pointsRemaining, githubRepoId, dueDate);
+
+    for (const repoId of githubRepoIds) {
+      db.prepare('INSERT OR IGNORE INTO ticket_repositories (ticket_id, repo_id) VALUES (?, ?)').run(id, repoId);
+    }
 
     for (const labelId of labelIds) {
       db.prepare('INSERT OR IGNORE INTO ticket_labels (ticket_id, label_id) VALUES (?, ?)').run(id, labelId);

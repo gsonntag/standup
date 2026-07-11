@@ -41,6 +41,8 @@ import {
   UserCircleIcon,
   UsersIcon,
   XIcon,
+  CopyIcon,
+  GitBranchIcon,
 } from '@phosphor-icons/react';
 import CommentThread from './CommentThread';
 import { useRealtime } from '@/lib/realtime';
@@ -48,6 +50,7 @@ import DescriptionPreview from './DescriptionPreview';
 import DependencyPicker from './DependencyPicker';
 import ImageUploadButton from './ImageUploadButton';
 import LabelPicker from './LabelPicker';
+import RepositoryPicker from './RepositoryPicker';
 
 const STATUS_ICONS = {
   backlog: KanbanIcon,
@@ -99,6 +102,8 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
   const [prError, setPrError] = useState('');
   const [activeTab, setActiveTab] = useState('comments');
   const [pendingStatus, setPendingStatus] = useState(null);
+  const [copyFeedback, setCopyFeedback] = useState(false);
+  const [selectedRepoId, setSelectedRepoId] = useState('');
 
   async function fetchTicket({ preserveDraft = isEditing } = {}) {
     const res = await apiFetch(`/api/tickets/${activeTicketId}`);
@@ -147,6 +152,88 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
     if (res.ok) {
       const data = await res.json();
       setCurrentUser(data.user || null);
+    }
+  }
+
+  useEffect(() => {
+    if (ticket && ticket.github_repositories && ticket.github_repositories.length > 0) {
+      const exists = ticket.github_repositories.some(r => r.id === selectedRepoId);
+      if (!exists) {
+        setSelectedRepoId(ticket.github_repositories[0].id);
+      }
+    } else {
+      setSelectedRepoId('');
+    }
+  }, [ticket]);
+
+  useEffect(() => {
+    if (selectedRepoId) {
+      if (commitPickerOpen) fetchCommitOptions(commitSearch, selectedRepoId);
+      if (prPickerOpen) fetchPrOptions(prSearch, selectedRepoId);
+    }
+  }, [selectedRepoId]);
+
+  const handleCopyTicketInfo = () => {
+    if (!ticket) return;
+
+    const sprintName = sprints.find(s => s.id === ticket.sprint_id)?.name || 'None';
+    const assigneesText = ticket.assignees?.map(a => `@${a.username}`).join(', ') || `@${ticket.assignee_username}` || 'Unassigned';
+    const reposText = ticket.github_repositories?.map(r => `${r.owner}/${r.name}`).join(', ') || (ticket.github_repository ? `${ticket.github_repository.owner}/${ticket.github_repository.name}` : 'None');
+    
+    let markdown = `# Ticket #${ticket.number}: ${ticket.title}\n\n`;
+    markdown += `- **Status**: ${ticket.status?.replaceAll('_', ' ')}\n`;
+    markdown += `- **Priority**: ${ticket.priority}\n`;
+    markdown += `- **Assignee(s)**: ${assigneesText}\n`;
+    markdown += `- **Creator**: @${ticket.creator_username}\n`;
+    markdown += `- **Sprint**: ${sprintName}\n`;
+    markdown += `- **Due Date**: ${ticket.due_date || 'None'}\n`;
+    markdown += `- **Story Points**: ${ticket.points_remaining ?? 'None'} / ${ticket.total_points ?? 'None'}\n`;
+    markdown += `- **Repositories**: ${reposText}\n\n`;
+
+    markdown += `## Description\n${ticket.description || 'No description provided.'}\n\n`;
+
+    if (relatedPrs.length > 0) {
+      markdown += `## Linked Pull Requests\n`;
+      relatedPrs.forEach(pr => {
+        markdown += `- #${pr.number} ${pr.title} (Repository: ${pr.repo_owner}/${pr.repo_name}, Status: ${pr.state}) - ${pr.html_url}\n`;
+      });
+      markdown += `\n`;
+    }
+
+    if (relatedCommits.length > 0) {
+      markdown += `## Linked Commits\n`;
+      relatedCommits.forEach(commit => {
+        markdown += `- ${commit.short_sha}: ${commit.message.split('\n')[0]} (Repository: ${commit.repo_owner}/${commit.repo_name}, Author: ${commit.author_login || commit.author_name}) - ${commit.html_url}\n`;
+      });
+      markdown += `\n`;
+    }
+
+    if (comments.length > 0) {
+      markdown += `## Comments\n`;
+      comments.forEach(comment => {
+        markdown += `- **@${comment.author_username}** (${new Date(comment.created_at).toLocaleString()}):\n  ${comment.content}\n\n`;
+      });
+    }
+
+    navigator.clipboard.writeText(markdown).then(() => {
+      setCopyFeedback(true);
+      setTimeout(() => setCopyFeedback(false), 2000);
+    });
+  };
+
+  async function updateRepositories(nextRepoIds) {
+    const res = await apiFetch(`/api/tickets/${activeTicketId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ github_repo_ids: nextRepoIds }),
+    });
+    if (res.ok) {
+      fetchTicket();
+      fetchComments();
+      fetchRelatedCommits();
+      fetchRelatedPrs();
+      setCommitOptions([]);
+      setPrOptions([]);
     }
   }
 
@@ -403,13 +490,14 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
     return value;
   }
 
-  async function fetchCommitOptions(search = commitSearch) {
-    if (!ticket.github_repo_id) return;
+  async function fetchCommitOptions(search = commitSearch, repoId = selectedRepoId) {
+    const activeRepoId = repoId || selectedRepoId || ticket?.github_repositories?.[0]?.id;
+    if (!activeRepoId) return;
     setCommitError('');
     setCommitLoading(true);
     const params = new URLSearchParams({ ticket_id: activeTicketId, limit: '100' });
     if (search) params.set('q', search);
-    const res = await apiFetch(`/api/github/repositories/${ticket.github_repo_id}/commits?${params.toString()}`);
+    const res = await apiFetch(`/api/github/repositories/${activeRepoId}/commits?${params.toString()}`);
     const data = await res.json();
     setCommitLoading(false);
     if (!res.ok) {
@@ -420,24 +508,26 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
   }
 
   async function syncCommits() {
-    if (!ticket.github_repo_id) return;
+    const activeRepoId = selectedRepoId || ticket?.github_repositories?.[0]?.id;
+    if (!activeRepoId) return;
     setCommitError('');
     setCommitSyncing(true);
-    const res = await apiFetch(`/api/github/repositories/${ticket.github_repo_id}/sync-commits`, { method: 'POST' });
+    const res = await apiFetch(`/api/github/repositories/${activeRepoId}/sync-commits`, { method: 'POST' });
     const data = await res.json();
     setCommitSyncing(false);
     if (!res.ok) {
       setCommitError(data.error || 'Failed to refresh commits.');
       return;
     }
-    fetchCommitOptions();
+    fetchCommitOptions(commitSearch, activeRepoId);
   }
 
   async function linkCommit(sha) {
+    const activeRepoId = selectedRepoId || ticket?.github_repositories?.[0]?.id;
     const res = await apiFetch(`/api/tickets/${activeTicketId}/commits`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sha }),
+      body: JSON.stringify({ sha, repo_id: activeRepoId }),
     });
     const data = await res.json();
     if (!res.ok) {
@@ -445,28 +535,29 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
       return;
     }
     setRelatedCommits(data.commits || []);
-    fetchCommitOptions();
+    fetchCommitOptions(commitSearch, activeRepoId);
   }
 
-  async function unlinkCommit(sha) {
+  async function unlinkCommit(sha, repoId) {
     const res = await apiFetch(`/api/tickets/${activeTicketId}/commits`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sha }),
+      body: JSON.stringify({ sha, repo_id: repoId }),
     });
     if (res.ok) {
       setRelatedCommits((prev) => prev.filter((commit) => commit.sha !== sha));
-      fetchCommitOptions();
+      fetchCommitOptions(commitSearch, selectedRepoId || ticket?.github_repositories?.[0]?.id);
     }
   }
 
-  async function fetchPrOptions(search = prSearch) {
-    if (!ticket.github_repo_id) return;
+  async function fetchPrOptions(search = prSearch, repoId = selectedRepoId) {
+    const activeRepoId = repoId || selectedRepoId || ticket?.github_repositories?.[0]?.id;
+    if (!activeRepoId) return;
     setPrError('');
     setPrLoading(true);
     const params = new URLSearchParams({ ticket_id: activeTicketId, limit: '100' });
     if (search) params.set('q', search);
-    const res = await apiFetch(`/api/github/repositories/${ticket.github_repo_id}/prs?${params.toString()}`);
+    const res = await apiFetch(`/api/github/repositories/${activeRepoId}/prs?${params.toString()}`);
     const data = await res.json();
     setPrLoading(false);
     if (!res.ok) {
@@ -477,24 +568,26 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
   }
 
   async function syncPrs() {
-    if (!ticket.github_repo_id) return;
+    const activeRepoId = selectedRepoId || ticket?.github_repositories?.[0]?.id;
+    if (!activeRepoId) return;
     setPrError('');
     setPrSyncing(true);
-    const res = await apiFetch(`/api/github/repositories/${ticket.github_repo_id}/sync-prs`, { method: 'POST' });
+    const res = await apiFetch(`/api/github/repositories/${activeRepoId}/sync-prs`, { method: 'POST' });
     const data = await res.json();
     setPrSyncing(false);
     if (!res.ok) {
       setPrError(data.error || 'Failed to refresh pull requests.');
       return;
     }
-    fetchPrOptions();
+    fetchPrOptions(prSearch, activeRepoId);
   }
 
   async function linkPr(prNumber) {
+    const activeRepoId = selectedRepoId || ticket?.github_repositories?.[0]?.id;
     const res = await apiFetch(`/api/tickets/${activeTicketId}/prs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pr_number: prNumber }),
+      body: JSON.stringify({ pr_number: prNumber, repo_id: activeRepoId }),
     });
     const data = await res.json();
     if (!res.ok) {
@@ -502,19 +595,19 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
       return;
     }
     setRelatedPrs(data.prs || []);
-    fetchPrOptions();
+    fetchPrOptions(prSearch, activeRepoId);
     fetchTicket();
   }
 
-  async function unlinkPr(prNumber) {
+  async function unlinkPr(prNumber, repoId) {
     const res = await apiFetch(`/api/tickets/${activeTicketId}/prs`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pr_number: prNumber }),
+      body: JSON.stringify({ pr_number: prNumber, repo_id: repoId }),
     });
     if (res.ok) {
       setRelatedPrs((prev) => prev.filter((pr) => pr.number !== prNumber));
-      fetchPrOptions();
+      fetchPrOptions(prSearch, selectedRepoId || ticket?.github_repositories?.[0]?.id);
     }
   }
 
@@ -643,10 +736,16 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
                 <Button type="button" size="sm" variant="outline" onClick={cancelEditing}>Cancel</Button>
               </>
             ) : (
-              <Button type="button" size="sm" variant="outline" onClick={startEditing}>
-                <PencilSimpleIcon weight="bold" />
-                Edit title and description
-              </Button>
+              <>
+                <Button type="button" size="sm" variant="outline" onClick={handleCopyTicketInfo}>
+                  {copyFeedback ? <CheckCircleIcon weight="bold" /> : <CopyIcon weight="bold" />}
+                  {copyFeedback ? 'Copied!' : 'Copy info'}
+                </Button>
+                <Button type="button" size="sm" variant="outline" onClick={startEditing}>
+                  <PencilSimpleIcon weight="bold" />
+                  Edit title and description
+                </Button>
+              </>
             )}
             <Button type="button" size="icon-sm" variant="ghost" onClick={() => onClose({ updated: true })}>
               <XIcon weight="bold" />
@@ -738,16 +837,29 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
 
               <TabsContent value="commits">
                 <section className="ticket-detail-section">
-                  <div className="ticket-detail-section-header">
+                  <div className="ticket-detail-section-header" style={{ flexWrap: 'wrap', gap: '12px' }}>
                     <div>
                       <h3>Related commits</h3>
                       <p>Link repository work back to this issue.</p>
                     </div>
+                    {ticket.github_repositories?.length > 1 && (
+                      <div className="flex items-center gap-2" style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span className="text-sm text-muted">Repository:</span>
+                        <Select value={selectedRepoId || ticket.github_repositories[0]?.id || ''} onValueChange={(value) => setSelectedRepoId(value)}>
+                          <SelectTrigger className="w-[180px] h-8"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {ticket.github_repositories.map((repo) => (
+                              <SelectItem key={repo.id} value={repo.id}>{repo.owner}/{repo.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                     <Button
                       type="button"
                       size="sm"
                       variant="outline"
-                      disabled={!ticket.github_repo_id}
+                      disabled={!ticket.github_repositories?.length}
                       onClick={() => {
                         const nextOpen = !commitPickerOpen;
                         setCommitPickerOpen(nextOpen);
@@ -758,24 +870,31 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
                       Link commits
                     </Button>
                   </div>
-                  {!ticket.github_repo_id && <div className="ticket-detail-empty">Select a repository before linking commits.</div>}
-                  {ticket.github_repo_id && relatedCommits.length === 0 && <div className="ticket-detail-empty">No commits linked.</div>}
+                  {!ticket.github_repositories?.length && <div className="ticket-detail-empty">Link a repository before linking commits.</div>}
+                  {ticket.github_repositories?.length > 0 && relatedCommits.length === 0 && <div className="ticket-detail-empty">No commits linked.</div>}
                   {relatedCommits.length > 0 && (
                     <ul className="commit-list">
                       {relatedCommits.map((commit) => (
                         <li className="commit-row" key={commit.sha}>
                           <div className="commit-main">
-                            <a href={commit.html_url} target="_blank" rel="noopener noreferrer" className="text-mono">{commit.short_sha}</a>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                              <a href={commit.html_url} target="_blank" rel="noopener noreferrer" className="text-mono">{commit.short_sha}</a>
+                              {commit.repo_name && (
+                                <Badge variant="outline" className="text-xs" style={{ background: 'var(--linear-surface-3)', border: '1px solid var(--linear-hairline)', borderRadius: '4px', paddingInline: '4px', height: '18px' }}>
+                                  {commit.repo_owner}/{commit.repo_name}
+                                </Badge>
+                              )}
+                            </div>
                             <span>{firstLine(commit.message)}</span>
                             <span className="text-muted text-sm">{commit.author_login || commit.author_name || 'unknown'} · {timeAgo(commit.committed_at)}</span>
                             {branchText(commit) && <span className="text-muted text-sm">{branchText(commit)}</span>}
                           </div>
-                          <Button type="button" size="sm" variant="outline" onClick={() => unlinkCommit(commit.sha)}>Unlink</Button>
+                          <Button type="button" size="sm" variant="outline" onClick={() => unlinkCommit(commit.sha, commit.repo_id)}>Unlink</Button>
                         </li>
                       ))}
                     </ul>
                   )}
-                  {commitPickerOpen && ticket.github_repo_id && (
+                  {commitPickerOpen && ticket.github_repositories?.length > 0 && (
                     <div className="label-picker-dropdown commit-picker">
                       <div className="ticket-detail-inline-controls">
                         <Input
@@ -819,16 +938,29 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
 
               <TabsContent value="prs">
                 <section className="ticket-detail-section">
-                  <div className="ticket-detail-section-header">
+                  <div className="ticket-detail-section-header" style={{ flexWrap: 'wrap', gap: '12px' }}>
                     <div>
                       <h3>Related pull requests</h3>
                       <p>Link pull requests back to this issue.</p>
                     </div>
+                    {ticket.github_repositories?.length > 1 && (
+                      <div className="flex items-center gap-2" style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span className="text-sm text-muted">Repository:</span>
+                        <Select value={selectedRepoId || ticket.github_repositories[0]?.id || ''} onValueChange={(value) => setSelectedRepoId(value)}>
+                          <SelectTrigger className="w-[180px] h-8"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {ticket.github_repositories.map((repo) => (
+                              <SelectItem key={repo.id} value={repo.id}>{repo.owner}/{repo.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                     <Button
                       type="button"
                       size="sm"
                       variant="outline"
-                      disabled={!ticket.github_repo_id}
+                      disabled={!ticket.github_repositories?.length}
                       onClick={() => {
                         const nextOpen = !prPickerOpen;
                         setPrPickerOpen(nextOpen);
@@ -839,23 +971,30 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
                       Link pull request
                     </Button>
                   </div>
-                  {!ticket.github_repo_id && <div className="ticket-detail-empty">Select a repository before linking pull requests.</div>}
-                  {ticket.github_repo_id && relatedPrs.length === 0 && <div className="ticket-detail-empty">No pull requests linked.</div>}
+                  {!ticket.github_repositories?.length && <div className="ticket-detail-empty">Link a repository before linking pull requests.</div>}
+                  {ticket.github_repositories?.length > 0 && relatedPrs.length === 0 && <div className="ticket-detail-empty">No pull requests linked.</div>}
                   {relatedPrs.length > 0 && (
                     <ul className="commit-list">
                       {relatedPrs.map((pr) => (
                         <li className="commit-row" key={pr.number}>
                           <div className="commit-main">
-                            <a href={pr.html_url} target="_blank" rel="noopener noreferrer" className="text-mono">#{pr.number}</a>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                              <a href={pr.html_url} target="_blank" rel="noopener noreferrer" className="text-mono">#{pr.number}</a>
+                              {pr.repo_name && (
+                                <Badge variant="outline" className="text-xs" style={{ background: 'var(--linear-surface-3)', border: '1px solid var(--linear-hairline)', borderRadius: '4px', paddingInline: '4px', height: '18px' }}>
+                                  {pr.repo_owner}/{pr.repo_name}
+                                </Badge>
+                              )}
+                            </div>
                             <span>{pr.title}</span>
                             <span className="text-muted text-sm">@{pr.author_login || 'unknown'} · state: {pr.state} · {timeAgo(pr.created_at)}</span>
                           </div>
-                          <Button type="button" size="sm" variant="outline" onClick={() => unlinkPr(pr.number)}>Unlink</Button>
+                          <Button type="button" size="sm" variant="outline" onClick={() => unlinkPr(pr.number, pr.repo_id)}>Unlink</Button>
                         </li>
                       ))}
                     </ul>
                   )}
-                  {prPickerOpen && ticket.github_repo_id && (
+                  {prPickerOpen && ticket.github_repositories?.length > 0 && (
                     <div className="label-picker-dropdown commit-picker">
                       <div className="ticket-detail-inline-controls">
                         <Input
@@ -958,20 +1097,13 @@ export default function TicketDetail({ ticketId, initialEditing = false, onClose
                 </Select>
               </div>
               <div className="ticket-property-field">
-                <Label>Repository</Label>
-                <Select value={ticket.github_repo_id || 'none'} onValueChange={(value) => updateField('github_repo_id', value === 'none' ? '' : value)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No repository</SelectItem>
-                    {repositories.map((repo) => <SelectItem key={repo.id} value={repo.id}>{repo.full_name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                {ticket.github_repository && (
-                  <a href={ticket.github_repository.html_url} target="_blank" rel="noopener noreferrer" className="ticket-external-link">
-                    <LinkIcon weight="bold" />
-                    Open repository
-                  </a>
-                )}
+                <Label>Repositories</Label>
+                <RepositoryPicker
+                  ticketId={activeTicketId}
+                  currentRepos={ticket.github_repositories || []}
+                  repositories={repositories}
+                  onUpdate={updateRepositories}
+                />
               </div>
               <div className="ticket-property-field">
                 <Label><TagIcon weight="bold" /> Labels</Label>

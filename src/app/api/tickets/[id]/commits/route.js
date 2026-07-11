@@ -24,6 +24,9 @@ function serializeCommit(row) {
     branches,
     linked_at: row.linked_at,
     linked_by_username: row.linked_by_username,
+    repo_owner: row.repo_owner,
+    repo_name: row.repo_name,
+    repo_id: row.repo_id,
   };
 }
 
@@ -38,9 +41,10 @@ export const GET = withAuth(async (_request, _user, context) => {
   if (!ticket) return jsonError('Ticket not found.', 404);
 
   const commits = db.prepare(`
-    SELECT gc.*, tc.linked_at, u.username AS linked_by_username
+    SELECT gc.*, tc.linked_at, u.username AS linked_by_username, gr.owner AS repo_owner, gr.name AS repo_name
     FROM ticket_commits tc
     JOIN github_commits gc ON gc.repo_id = tc.repo_id AND gc.sha = tc.sha
+    JOIN github_repositories gr ON gr.id = tc.repo_id
     JOIN users u ON u.id = tc.linked_by
     WHERE tc.ticket_id = ?
     ORDER BY gc.committed_at DESC, gc.sha ASC
@@ -54,16 +58,21 @@ export const POST = withAuth(async (request, user, context) => {
   const ticketId = await getId(context);
   const ticket = getTicket(db, ticketId);
   if (!ticket) return jsonError('Ticket not found.', 404);
-  if (!ticket.github_repo_id) return jsonError('Select a GitHub repository before linking commits.');
 
   const body = await request.json();
+  const repoId = body.repo_id || ticket.github_repo_id;
+  if (!repoId) return jsonError('Select a GitHub repository before linking commits.');
+
+  const isLinked = db.prepare('SELECT 1 FROM ticket_repositories WHERE ticket_id = ? AND repo_id = ?').get(ticketId, repoId);
+  if (!isLinked) return jsonError('Repository is not linked to this ticket.', 400);
+
   const shas = Array.isArray(body.shas) ? body.shas : [body.sha];
   const normalizedShas = [...new Set(shas.map((sha) => String(sha || '').trim()).filter(Boolean))];
   if (!normalizedShas.length) return jsonError('At least one commit SHA is required.');
 
   const missing = normalizedShas.find((sha) => !db.prepare(`
     SELECT sha FROM github_commits WHERE repo_id = ? AND sha = ?
-  `).get(ticket.github_repo_id, sha));
+  `).get(repoId, sha));
   if (missing) return jsonError('Commit not found for this ticket repository.', 404);
 
   const tx = db.transaction(() => {
@@ -72,16 +81,17 @@ export const POST = withAuth(async (request, user, context) => {
       VALUES (?, ?, ?, ?)
     `);
     for (const sha of normalizedShas) {
-      insert.run(ticketId, ticket.github_repo_id, sha, user.id);
+      insert.run(ticketId, repoId, sha, user.id);
     }
   });
   tx();
 
   publish({ kind: 'ticket', id: ticketId, action: 'updated' });
   return NextResponse.json({ commits: db.prepare(`
-    SELECT gc.*, tc.linked_at, u.username AS linked_by_username
+    SELECT gc.*, tc.linked_at, u.username AS linked_by_username, gr.owner AS repo_owner, gr.name AS repo_name
     FROM ticket_commits tc
     JOIN github_commits gc ON gc.repo_id = tc.repo_id AND gc.sha = tc.sha
+    JOIN github_repositories gr ON gr.id = tc.repo_id
     JOIN users u ON u.id = tc.linked_by
     WHERE tc.ticket_id = ?
     ORDER BY gc.committed_at DESC, gc.sha ASC
@@ -98,8 +108,13 @@ export const DELETE = withAuth(async (request, _user, context) => {
   const sha = String(body.sha || '').trim();
   if (!sha) return jsonError('Commit SHA is required.');
 
-  db.prepare('DELETE FROM ticket_commits WHERE ticket_id = ? AND sha = ?').run(ticketId, sha);
+  const repoId = body.repo_id || ticket.github_repo_id;
+  if (repoId) {
+    db.prepare('DELETE FROM ticket_commits WHERE ticket_id = ? AND repo_id = ? AND sha = ?').run(ticketId, repoId, sha);
+  } else {
+    db.prepare('DELETE FROM ticket_commits WHERE ticket_id = ? AND sha = ?').run(ticketId, sha);
+  }
+
   publish({ kind: 'ticket', id: ticketId, action: 'updated' });
   return NextResponse.json({ ok: true });
 });
-
