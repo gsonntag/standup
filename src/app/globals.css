@@ -3,6 +3,24 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* Prevent flash of unstyled web components before they are defined */
+md-filled-button:not(:defined),
+md-outlined-button:not(:defined),
+md-elevated-button:not(:defined),
+md-text-button:not(:defined),
+md-checkbox:not(:defined),
+md-dialog:not(:defined),
+md-outlined-select:not(:defined),
+md-select-option:not(:defined),
+md-outlined-text-field:not(:defined),
+md-switch:not(:defined),
+md-tabs:not(:defined),
+md-primary-tab:not(:defined),
+md-secondary-tab:not(:defined) {
+  opacity: 0;
+  visibility: hidden;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -68,6 +86,50 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  /* Material Design 3 CSS Variables Mapping */
+  --md-sys-color-primary: var(--primary);
+  --md-sys-color-on-primary: var(--primary-foreground);
+  --md-sys-color-primary-container: oklch(0.92 0.02 240);
+  --md-sys-color-on-primary-container: oklch(0.2 0.05 240);
+  --md-sys-color-secondary: var(--secondary);
+  --md-sys-color-on-secondary: var(--secondary-foreground);
+  --md-sys-color-surface: var(--bg);
+  --md-sys-color-on-surface: var(--text);
+  --md-sys-color-surface-variant: var(--bg-alt);
+  --md-sys-color-on-surface-variant: var(--text-muted);
+  --md-sys-color-outline: var(--border);
+  --md-sys-color-outline-variant: var(--border);
+  --md-sys-color-error: var(--danger);
+  --md-sys-color-background: var(--bg);
+  --md-sys-color-on-background: var(--text);
+  
+  /* Text field overrides */
+  --md-outlined-text-field-container-shape: 8px;
+  --md-outlined-text-field-outline-color: var(--border);
+  --md-outlined-text-field-focus-outline-color: var(--primary);
+  --md-outlined-text-field-input-text-color: var(--text);
+  --md-outlined-text-field-input-text-font: var(--font-sans);
+  --md-outlined-text-field-label-text-color: var(--text-muted);
+  --md-outlined-text-field-focus-label-text-color: var(--primary);
+
+  /* Checkbox overrides */
+  --md-checkbox-selected-container-color: var(--primary);
+  --md-checkbox-selected-icon-color: var(--primary-foreground);
+  --md-checkbox-outline-color: var(--border);
+
+  /* Select overrides */
+  --md-outlined-select-container-shape: 8px;
+  --md-outlined-select-outline-color: var(--border);
+  --md-outlined-select-focus-outline-color: var(--primary);
+  --md-outlined-select-text-color: var(--text);
+  --md-outlined-select-label-text-color: var(--text-muted);
+
+  /* Dialog overrides */
+  --md-dialog-container-color: var(--bg);
+  --md-dialog-headline-color: var(--text);
+  --md-dialog-supporting-text-color: var(--text-muted);
+  --md-dialog-container-shape: 28px;
 }
 
 html, body {
@@ -533,7 +595,7 @@ tr:not([data-slot="table-row"]):hover td:not([data-slot="table-cell"]) { backgro
 @layer base {
   .theme { --font-heading: var(--font-sans); --font-sans: var(--font-sans); }
   :root { --background: oklch(0.985 0 0); --foreground: oklch(0.18 0 0); --card: oklch(1 0 0); --card-foreground: oklch(0.18 0 0); --popover: oklch(1 0 0); --popover-foreground: oklch(0.18 0 0); --primary: oklch(0.22 0 0); --primary-foreground: oklch(0.98 0 0); --secondary: oklch(0.955 0 0); --secondary-foreground: oklch(0.22 0 0); --muted: oklch(0.955 0 0); --muted-foreground: oklch(0.50 0 0); --accent: oklch(0.94 0 0); --accent-foreground: oklch(0.22 0 0); --destructive: oklch(0.58 0.21 25); --destructive-foreground: oklch(0.98 0 0); --border: oklch(0.88 0 0); --input: oklch(0.92 0 0); --ring: oklch(0.62 0 0); --chart-1: oklch(0.87 0 0); --chart-2: oklch(0.556 0 0); --chart-3: oklch(0.439 0 0); --chart-4: oklch(0.371 0 0); --chart-5: oklch(0.269 0 0); --radius: 0.5rem; --sidebar: oklch(0.985 0 0); --sidebar-foreground: oklch(0.145 0 0); --sidebar-primary: oklch(0.205 0 0); --sidebar-primary-foreground: oklch(0.985 0 0); --sidebar-accent: oklch(0.97 0 0); --sidebar-accent-foreground: oklch(0.205 0 0); --sidebar-border: oklch(0.922 0 0); --sidebar-ring: oklch(0.708 0 0); }
-  .dark { --background: oklch(0.145 0 0); --foreground: oklch(0.985 0 0); --card: oklch(0.205 0 0); --card-foreground: oklch(0.985 0 0); --popover: oklch(0.205 0 0); --popover-foreground: oklch(0.985 0 0); --primary: oklch(0.922 0 0); --primary-foreground: oklch(0.205 0 0); --secondary: oklch(0.269 0 0); --secondary-foreground: oklch(0.985 0 0); --muted: oklch(0.269 0 0); --muted-foreground: oklch(0.708 0 0); --accent: oklch(0.269 0 0); --accent-foreground: oklch(0.985 0 0); --destructive: oklch(0.704 0.191 22.216); --border: oklch(1 0 0 / 10%); --input: oklch(1 0 0 / 15%); --ring: oklch(0.556 0 0); --chart-1: oklch(0.87 0 0); --chart-2: oklch(0.556 0 0); --chart-3: oklch(0.439 0 0); --chart-4: oklch(0.371 0 0); --chart-5: oklch(0.269 0 0); --sidebar: oklch(0.205 0 0); --sidebar-foreground: oklch(0.985 0 0); --sidebar-primary: oklch(0.488 0.243 264.376); --sidebar-primary-foreground: oklch(0.985 0 0); --sidebar-accent: oklch(0.269 0 0); --sidebar-accent-foreground: oklch(0.985 0 0); --sidebar-border: oklch(1 0 0 / 10%); --sidebar-ring: oklch(0.556 0 0); }
+  .dark { --background: oklch(0.145 0 0); --foreground: oklch(0.985 0 0); --card: oklch(0.205 0 0); --card-foreground: oklch(0.985 0 0); --popover: oklch(0.205 0 0); --popover-foreground: oklch(0.985 0 0); --primary: oklch(0.922 0 0); --primary-foreground: oklch(0.205 0 0); --secondary: oklch(0.269 0 0); --secondary-foreground: oklch(0.985 0 0); --muted: oklch(0.269 0 0); --muted-foreground: oklch(0.708 0 0); --accent: oklch(0.269 0 0); --accent-foreground: oklch(0.985 0 0); --destructive: oklch(0.704 0.191 22.216); --border: oklch(1 0 0 / 10%); --input: oklch(1 0 0 / 15%); --ring: oklch(0.556 0 0); --chart-1: oklch(0.87 0 0); --chart-2: oklch(0.556 0 0); --chart-3: oklch(0.439 0 0); --chart-4: oklch(0.371 0 0); --chart-5: oklch(0.269 0 0); --sidebar: oklch(0.205 0 0); --sidebar-foreground: oklch(0.985 0 0); --sidebar-primary: oklch(0.488 0.243 264.376); --sidebar-primary-foreground: oklch(0.985 0 0); --sidebar-accent: oklch(0.269 0 0); --sidebar-accent-foreground: oklch(0.985 0 0); --sidebar-border: oklch(1 0 0 / 10%); --sidebar-ring: oklch(0.556 0 0); --md-sys-color-primary-container: oklch(0.25 0.02 240); --md-sys-color-on-primary-container: oklch(0.9 0.01 240); }
   * {
     border-color: var(--border);
     outline-color: var(--ring);
