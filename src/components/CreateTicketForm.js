@@ -38,7 +38,7 @@ export default function CreateTicketForm({ users, onCreated, onCancel }) {
   const [priority, setPriority] = useState('medium');
   const [assigneeIds, setAssigneeIds] = useState(new Set());
   const [sprintId, setSprintId] = useState('');
-  const [githubRepoId, setGithubRepoId] = useState('');
+  const [githubRepoIds, setGithubRepoIds] = useState(new Set());
   const [repositories, setRepositories] = useState([]);
   const [sprints, setSprints] = useState([]);
   const [tickets, setTickets] = useState([]);
@@ -102,7 +102,7 @@ export default function CreateTicketForm({ users, onCreated, onCancel }) {
         priority,
         sprint_id: sprintId || null,
         assignee_ids: [...assigneeIds],
-        github_repo_id: githubRepoId || null,
+        github_repo_ids: Array.from(githubRepoIds),
         due_date: dueDate || null,
         label_ids: selectedLabels.map((label) => label.id),
         watcher_ids: [...watcherIds],
@@ -257,16 +257,21 @@ export default function CreateTicketForm({ users, onCreated, onCancel }) {
                   <p className="ticket-property-hint">Add the ticket to a sprint before assigning it.</p>
                 )}
               </AppField>
-              <AppField id="ticket-github-repo" label="Repository" icon={GitBranchIcon}>
-                <Select value={githubRepoId || 'none'} onValueChange={(value) => setGithubRepoId(value === 'none' ? '' : value)}>
-                  <SelectTrigger id="ticket-github-repo">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No repository</SelectItem>
-                    {repositories.map((repo) => <SelectItem key={repo.id} value={repo.id}>{repo.full_name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+              <AppField id="ticket-github-repos" label="Repositories" icon={GitBranchIcon}>
+                <div className="create-ticket-check-list">
+                  {repositories.map((repo) => (
+                    <button
+                      key={repo.id}
+                      type="button"
+                      className="create-ticket-check-row"
+                      onClick={() => toggleSetValue(setGithubRepoIds, repo.id)}
+                    >
+                      <Checkbox checked={githubRepoIds.has(repo.id)} aria-hidden="true" tabIndex={-1} />
+                      <span>{repo.full_name}</span>
+                    </button>
+                  ))}
+                  {!repositories.length && <div className="ticket-detail-empty">No repositories configured.</div>}
+                </div>
               </AppField>
               <AppField id="ticket-due-date" label="Due Date" icon={FlagIcon}>
                 {ticketRules.canSetDueDate(sprintId) ? (

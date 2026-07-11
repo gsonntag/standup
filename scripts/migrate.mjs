@@ -340,5 +340,22 @@ if (!githubTicketColumns.includes('github_repo_id')) {
 }
 db.exec('CREATE INDEX IF NOT EXISTS idx_tickets_github_repo ON tickets(github_repo_id);');
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS ticket_repositories (
+    ticket_id TEXT NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+    repo_id   TEXT NOT NULL REFERENCES github_repositories(id) ON DELETE CASCADE,
+    PRIMARY KEY (ticket_id, repo_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_ticket_repositories_ticket ON ticket_repositories(ticket_id);
+  CREATE INDEX IF NOT EXISTS idx_ticket_repositories_repo ON ticket_repositories(repo_id);
+`);
+
+const ticketsWithRepo = db.prepare("SELECT id, github_repo_id FROM tickets WHERE github_repo_id IS NOT NULL").all();
+for (const row of ticketsWithRepo) {
+  db.prepare("INSERT OR IGNORE INTO ticket_repositories (ticket_id, repo_id) VALUES (?, ?)")
+    .run(row.id, row.github_repo_id);
+}
+
 console.log('Migrations complete. Database at:', DB_PATH);
 db.close();
+

@@ -137,6 +137,19 @@ export const PATCH = withAuth(async (request, user, context) => {
       }
     }
   }
+  const reposRequested = 'github_repo_ids' in body || 'github_repo_id' in body;
+  const existingRepoIds = db.prepare('SELECT repo_id FROM ticket_repositories WHERE ticket_id = ?').all(id).map((row) => row.repo_id);
+  const nextRepoIds = reposRequested
+    ? normalizeIdList('github_repo_ids' in body ? body.github_repo_ids : (body.github_repo_id ? [body.github_repo_id] : []))
+    : existingRepoIds;
+  if (reposRequested) {
+    for (const repoId of nextRepoIds) {
+      if (!db.prepare('SELECT id FROM github_repositories WHERE id = ?').get(repoId)) {
+        return jsonError('GitHub repository not found.', 404);
+      }
+    }
+    body.github_repo_id = nextRepoIds[0] || null;
+  }
   const allowed = ['title', 'description', 'status', 'priority', 'sprint_id', 'assignee_id', 'sort_order', 'due_date', 'total_points', 'points_remaining', 'github_repo_id'];
   const sets = [];
   const args = [];
@@ -362,9 +375,17 @@ export const PATCH = withAuth(async (request, user, context) => {
       if ('description' in body) {
         attachMarkdownImagesToTicket(db, { ticketId: id, description: body.description || '', userId: user.id });
       }
-      if ('github_repo_id' in body && (body.github_repo_id || null) !== (existing.github_repo_id || null)) {
-        db.prepare('DELETE FROM ticket_commits WHERE ticket_id = ?').run(id);
-        db.prepare('DELETE FROM ticket_pull_requests WHERE ticket_id = ?').run(id);
+      if (reposRequested) {
+        db.prepare('DELETE FROM ticket_repositories WHERE ticket_id = ?').run(id);
+        for (const repoId of nextRepoIds) {
+          db.prepare('INSERT OR IGNORE INTO ticket_repositories (ticket_id, repo_id) VALUES (?, ?)').run(id, repoId);
+        }
+        const removedRepoIds = existingRepoIds.filter((oldId) => !nextRepoIds.includes(oldId));
+        if (removedRepoIds.length > 0) {
+          const placeholders = removedRepoIds.map(() => '?').join(',');
+          db.prepare(`DELETE FROM ticket_commits WHERE ticket_id = ? AND repo_id IN (${placeholders})`).run(id, ...removedRepoIds);
+          db.prepare(`DELETE FROM ticket_pull_requests WHERE ticket_id = ? AND repo_id IN (${placeholders})`).run(id, ...removedRepoIds);
+        }
       }
     });
     tx();
