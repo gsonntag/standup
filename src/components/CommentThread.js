@@ -7,10 +7,24 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { PaperPlaneRightIcon, TrashIcon } from '@phosphor-icons/react';
 
-function renderCommentContent(content, users, onTicketRef) {
-  const usernames = new Set((users || []).map((u) => u.username));
-  const parts = content.split(/(@\w+|#\d+)/g);
-  return parts.map((part, i) => {
+const INLINE_PATTERN = /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\((?:https?:\/\/[^)\s]+|\/uploads\/[^)\s]+)\)|@\w+|#\d+)/g;
+
+function renderInline(text, usernames, onTicketRef) {
+  return text.split(INLINE_PATTERN).filter(Boolean).map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={i}>{part.slice(2, -2)}</strong>;
+    }
+    if (part.startsWith('`') && part.endsWith('`')) {
+      return <code key={i}>{part.slice(1, -1)}</code>;
+    }
+    const link = part.match(/^\[([^\]]+)\]\((https?:\/\/[^)\s]+|\/uploads\/[^)\s]+)\)$/);
+    if (link) {
+      return (
+        <a key={i} href={link[2]} target={link[2].startsWith('http') ? '_blank' : undefined} rel="noreferrer">
+          {link[1]}
+        </a>
+      );
+    }
     if (part.startsWith('@') && usernames.has(part.slice(1))) {
       return <strong key={i}>{part}</strong>;
     }
@@ -23,6 +37,35 @@ function renderCommentContent(content, users, onTicketRef) {
       );
     }
     return part;
+  });
+}
+
+function renderCommentContent(content, users, onTicketRef) {
+  const usernames = new Set((users || []).map((u) => u.username));
+  const lines = content.split('\n');
+
+  return lines.map((line, index) => {
+    const trimmed = line.trim();
+    if (!trimmed) return <div key={index} className="description-spacer" />;
+    if (trimmed.startsWith('### ')) return <h4 key={index}>{renderInline(trimmed.slice(4), usernames, onTicketRef)}</h4>;
+    if (trimmed.startsWith('## ')) return <h3 key={index}>{renderInline(trimmed.slice(3), usernames, onTicketRef)}</h3>;
+    if (trimmed.startsWith('# ')) return <h2 key={index}>{renderInline(trimmed.slice(2), usernames, onTicketRef)}</h2>;
+
+    const checkbox = trimmed.match(/^- \[([ xX])\] (.*)$/);
+    if (checkbox) {
+      return (
+        <div key={index} className="description-check">
+          <input type="checkbox" checked={checkbox[1].toLowerCase() === 'x'} readOnly />
+          <span>{renderInline(checkbox[2], usernames, onTicketRef)}</span>
+        </div>
+      );
+    }
+
+    if (trimmed.startsWith('- ')) {
+      return <div key={index} className="description-bullet">{renderInline(trimmed.slice(2), usernames, onTicketRef)}</div>;
+    }
+
+    return <p key={index}>{renderInline(trimmed, usernames, onTicketRef)}</p>;
   });
 }
 
