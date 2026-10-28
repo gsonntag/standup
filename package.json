@@ -7,13 +7,19 @@
     "build": "next build",
     "start": "next start",
     "migrate": "node scripts/migrate.mjs",
-    "create-user": "node scripts/create-user.mjs"
+    "create-user": "node scripts/create-user.mjs",
+    "astryx": "PATH=\"$HOME/.nvm/versions/node/v22.23.2/bin:$PATH\" node node_modules/@astryxdesign/cli/clients/cli/bin/astryx.mjs"
   },
   "dependencies": {
+    "@astryxdesign/cli": "^0.4.3",
+    "@astryxdesign/core": "^0.7.4",
+    "@astryxdesign/theme-neutral": "^0.7.4",
     "@dnd-kit/core": "latest",
     "@dnd-kit/sortable": "latest",
     "@dnd-kit/utilities": "latest",
+    "@heroicons/react": "^2.2.0",
     "@phosphor-icons/react": "^2.1.10",
+    "@stylexjs/stylex": "^0.19.1",
     "bcryptjs": "latest",
     "better-sqlite3": "latest",
     "class-variance-authority": "^0.7.1",
@@ -31,7 +37,9 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.0",
+    "@types/react": "19.3.0",
     "postcss": "^8.5.15",
-    "tailwindcss": "^4.3.0"
+    "tailwindcss": "^4.3.0",
+    "typescript": "5.8.2"
   }
 }

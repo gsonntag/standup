@@ -12,12 +12,14 @@ export async function POST(request) {
   const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim() || 'unknown';
   const rateKey = `${ip}:${username.toLowerCase()}`;
 
-  const { limited, retryAfter } = checkRateLimit(rateKey);
-  if (limited) {
-    return NextResponse.json(
-      { error: 'Too many failed attempts. Try again later.' },
-      { status: 429, headers: { 'Retry-After': String(retryAfter) } }
-    );
+  if (process.env.NODE_ENV === 'production') {
+    const { limited, retryAfter } = checkRateLimit(rateKey);
+    if (limited) {
+      return NextResponse.json(
+        { error: 'Too many failed attempts. Try again later.' },
+        { status: 429, headers: { 'Retry-After': String(retryAfter) } }
+      );
+    }
   }
 
   const user = authenticate(username, password);

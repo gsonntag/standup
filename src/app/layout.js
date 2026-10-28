@@ -1,8 +1,8 @@
 import './globals.css';
 import { getCurrentUser } from '@/lib/auth';
-import Navbar from '@/components/Navbar';
+import AppShellLayout from '@/components/AppShellLayout';
 import PasswordGuard from '@/components/PasswordGuard';
-import { TooltipProvider } from '@/components/ui/tooltip';
+import AppTheme from '@/components/AppTheme';
 
 export const metadata = {
   title: 'Standup',
@@ -23,25 +23,25 @@ export default async function RootLayout({ children }) {
             __html: `
               (function() {
                 try {
-                  var savedTheme = localStorage.getItem('standup-theme');
-                  var theme = savedTheme === 'dark' ? 'dark' : 'light';
-                  document.documentElement.dataset.theme = theme;
-                  document.documentElement.classList.toggle('dark', theme === 'dark');
-                } catch (_) {
-                  document.documentElement.dataset.theme = 'light';
-                  document.documentElement.classList.remove('dark');
-                }
+                  var saved = localStorage.getItem('standup-theme');
+                  var isDark = saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches);
+                  var theme = isDark ? 'dark' : 'light';
+                  document.documentElement.setAttribute('data-theme', theme);
+                  document.documentElement.setAttribute('data-astryx-theme', 'neutral');
+                  document.documentElement.classList.toggle('dark', isDark);
+                } catch (_) {}
               })();
             `,
           }}
         />
       </head>
       <body>
-        <TooltipProvider>
-          {user && <Navbar user={user} />}
-          {user && <PasswordGuard mustChange={!!user.must_change_password} />}
-          {children}
-        </TooltipProvider>
+        <AppTheme>
+          <AppShellLayout user={user}>
+            {user && <PasswordGuard mustChange={!!user.must_change_password} />}
+            {children}
+          </AppShellLayout>
+        </AppTheme>
       </body>
     </html>
   );

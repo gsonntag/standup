@@ -3,6 +3,9 @@ node_modules/
 data/*.db
 data/*.db-shm
 data/*.db-wal
+*.db
+*.db-shm
+*.db-wal
 .agent/CONTINUITY.md
 .env.local
 AGENTS.md

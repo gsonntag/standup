@@ -1,12 +1,12 @@
 import { Suspense } from 'react';
 import { requireCurrentUser } from '@/lib/require-user';
-import BacklogView from '@/components/BacklogView';
+import AstryxTicketsTable from '@/components/AstryxTicketsTable';
 
 export default async function TicketsPage() {
   const user = await requireCurrentUser();
   return (
     <Suspense>
-      <BacklogView currentUser={user} />
+      <AstryxTicketsTable currentUser={user} />
     </Suspense>
   );
 }
