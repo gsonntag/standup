@@ -3,92 +3,35 @@
 import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/client-api';
 import { timeAgo } from '@/lib/dates';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { BellIcon, CheckCircleIcon, EyeIcon, ListChecksIcon, WarningCircleIcon } from '@phosphor-icons/react';
+import {
+  Layout,
+  LayoutHeader,
+  LayoutContent,
+  HStack,
+  VStack,
+} from '@astryxdesign/core/Layout';
+import { Text, Heading } from '@astryxdesign/core/Text';
+import { Card } from '@astryxdesign/core/Card';
+import { Badge } from '@astryxdesign/core/Badge';
+import { Button } from '@astryxdesign/core/Button';
+import { StatusDot } from '@astryxdesign/core/StatusDot';
+import { EmptyState } from '@astryxdesign/core/EmptyState';
+import { Table, pixel, proportional } from '@astryxdesign/core/Table';
 import TicketDetail from '@/components/TicketDetail';
-import AppPageHeader from '@/components/AppPageHeader';
 
-function TaskTable({ tickets, empty, dateLabel, dateRenderer, onSelect }) {
-  if (tickets.length === 0) {
-    return <div className="my-tasks-empty">{empty}</div>;
-  }
-
-  return (
-    <div className="table-container">
-      <Table className="backlog-table flat-data-table">
-        <TableHeader>
-          <TableRow className="ticket-table-head-row">
-            <TableHead className="ticket-col-head ticket-col-static ticket-issue-col">Tickets</TableHead>
-            <TableHead className="ticket-col-head ticket-col-static" style={{ width: 130 }}>Status</TableHead>
-            <TableHead className="ticket-col-head ticket-col-static" style={{ width: 140 }}>{dateLabel}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {tickets.map((t) => (
-            <TableRow key={t.id} className="ticket-row" onClick={() => onSelect(t.id)}>
-              <TableCell className="ticket-issue-cell">
-                <div className="ticket-issue-inner">
-                  <span className="ticket-id">#{t.number}</span>
-                  <span className="ticket-title-text">{t.title}</span>
-                </div>
-              </TableCell>
-              <TableCell className="ticket-priority-cell">
-                <Badge className={`status-badge status-badge-${t.status}`} variant="outline">{t.status.replaceAll('_', ' ')}</Badge>
-              </TableCell>
-              <TableCell className="ticket-assignee-cell text-muted">{dateRenderer(t)}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
-  );
-}
-
-function MentionList({ mentions, onSelect }) {
-  if (mentions.length === 0) return <div className="my-tasks-empty">No mentions.</div>;
-
-  return (
-    <div className="my-task-list flat-ticket-list">
-      {mentions.map((m) => (
-        <button key={m.mention_id} type="button" className="my-task-list-item ticket-row-flat" onClick={() => onSelect(m.ticket_id)}>
-          <span className="my-task-list-icon"><BellIcon weight="bold" /></span>
-          <div className="ticket-issue-inner">
-            <span className="ticket-id">#{m.ticket_number}</span>
-            <span className="ticket-title-text">{m.ticket_title}</span>
-          </div>
-          <span className="dashboard-ticket-meta">{timeAgo(m.created_at)}</span>
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function BlockerList({ tickets, onSelect }) {
-  if (tickets.length === 0) return <div className="my-tasks-empty">No recently unblocked tickets.</div>;
-
-  return (
-    <div className="my-task-list flat-ticket-list">
-      {tickets.map((t) => (
-        <button key={t.id} type="button" className="my-task-list-item ticket-row-flat" onClick={() => onSelect(t.id)}>
-          <span className="my-task-list-icon my-task-list-icon-success"><CheckCircleIcon weight="bold" /></span>
-          <div className="ticket-issue-inner">
-            <span className="ticket-id">#{t.number}</span>
-            <span className="ticket-title-text">{t.title}</span>
-          </div>
-          <Badge className={`status-badge status-badge-${t.status}`} variant="outline">{t.status.replaceAll('_', ' ')}</Badge>
-        </button>
-      ))}
-    </div>
-  );
-}
+const STATUS_VARIANTS = {
+  todo: { variant: 'warning', label: 'To Do' },
+  in_progress: { variant: 'accent', label: 'In Progress' },
+  in_review: { variant: 'warning', label: 'In Review' },
+  done: { variant: 'success', label: 'Done' },
+  backlog: { variant: 'neutral', label: 'Backlog' },
+};
 
 const MY_TASK_TABS = [
-  { key: 'assigned', label: 'Assigned', icon: ListChecksIcon },
-  { key: 'mentions', label: 'Mentions', icon: BellIcon },
-  { key: 'watching', label: 'Watching', icon: EyeIcon },
-  { key: 'blockers', label: 'Unblocked', icon: WarningCircleIcon },
+  { key: 'assigned', label: 'Assigned' },
+  { key: 'mentions', label: 'Mentions' },
+  { key: 'watching', label: 'Watching' },
+  { key: 'blockers', label: 'Unblocked' },
 ];
 
 export default function MyTasksView({ currentUser }) {
@@ -102,89 +45,202 @@ export default function MyTasksView({ currentUser }) {
     setData(d);
   }
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => {
+    fetchData();
+  }, []);
 
-  if (!data) return <div className="page"><div className="empty">Loading…</div></div>;
+  if (!data) {
+    return (
+      <Layout height="fill" contentWidth="fill">
+        <LayoutContent padding={4}>
+          <Text type="body" color="secondary">Loading tasks…</Text>
+        </LayoutContent>
+      </Layout>
+    );
+  }
 
   const summary = [
-    { label: 'Assigned', value: data.assigned.length, icon: ListChecksIcon },
-    { label: 'Mentions', value: data.mentions.length, icon: BellIcon },
-    { label: 'Watching', value: data.watching.length, icon: EyeIcon },
-    { label: 'Unblocked', value: data.blockers_cleared.length, icon: WarningCircleIcon },
+    { label: 'Assigned', value: data.assigned.length, key: 'assigned' },
+    { label: 'Mentions', value: data.mentions.length, key: 'mentions' },
+    { label: 'Watching', value: data.watching.length, key: 'watching' },
+    { label: 'Unblocked', value: data.blockers_cleared.length, key: 'blockers' },
+  ];
+
+  const columns = [
+    {
+      key: 'number',
+      header: 'ID',
+      width: pixel(75),
+      renderCell: (t) => (
+        <Text type="body" weight="bold" color="secondary" size="sm">
+          #{t.number}
+        </Text>
+      ),
+    },
+    {
+      key: 'title',
+      header: 'Title',
+      width: proportional(2),
+      renderCell: (t) => (
+        <Text type="body" weight="medium" size="sm">
+          {t.title}
+        </Text>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      width: pixel(130),
+      renderCell: (t) => {
+        const st = STATUS_VARIANTS[t.status] || { variant: 'neutral', label: t.status };
+        return <StatusDot variant={st.variant} label={st.label} />;
+      },
+    },
+    {
+      key: 'due_date',
+      header: 'Due / Updated',
+      width: pixel(140),
+      renderCell: (t) => (
+        <Text type="body" color="secondary" size="sm">
+          {t.due_date ? `Due ${t.due_date}` : timeAgo(t.updated_at)}
+        </Text>
+      ),
+    },
   ];
 
   return (
-    <div className="page my-tasks-page">
-      <AppPageHeader
-        icon={ListChecksIcon}
-        eyebrow="Inbox"
-        title="My Tasks"
-        subtitle="Your assigned work, mentions, watched issues, and recently cleared blockers."
-      />
+    <Layout height="fill" contentWidth="fill">
+      {/* Header */}
+      <LayoutHeader hasDivider padding={4}>
+        <VStack gap={4}>
+          <VStack gap={1}>
+            <Heading level={2}>My Tasks</Heading>
+            <Text type="body" color="secondary" size="sm">
+              Your assigned work, mentions, watched issues, and recently cleared blockers.
+            </Text>
+          </VStack>
 
-      <div className="my-tasks-summary-grid">
-        {summary.map((item) => (
-          <Card key={item.label} className="my-task-summary-card ds-card">
-            <CardContent>
-              <span className="my-task-summary-icon"><item.icon weight="bold" /></span>
-              <span>{item.label}</span>
-              <strong>{item.value}</strong>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+          {/* KPI Summary Cards */}
+          <HStack gap={3} wrap="wrap">
+            {summary.map((item) => (
+              <Card
+                key={item.label}
+                padding={3}
+                style={{
+                  minWidth: 140,
+                  cursor: 'pointer',
+                  backgroundColor: activeTab === item.key ? 'var(--color-overlay-hover)' : 'var(--color-background-surface)',
+                  border: activeTab === item.key ? '1px solid var(--color-accent)' : '1px solid var(--color-border)',
+                }}
+                onClick={() => setActiveTab(item.key)}
+              >
+                <VStack gap={1}>
+                  <Text type="supporting" color="secondary" size="xs">
+                    {item.label}
+                  </Text>
+                  <Text type="body" weight="bold" size="xl" hasTabularNumbers>
+                    {item.value}
+                  </Text>
+                </VStack>
+              </Card>
+            ))}
+          </HStack>
 
-      <div className="my-tasks-tabbar">
-        <nav className="dashboard-topnav-tabs" role="tablist" aria-label="Task inbox">
-          {MY_TASK_TABS.map(({ key, label, icon: Icon }) => (
-            <button
-              key={key}
-              type="button"
-              role="tab"
-              aria-selected={activeTab === key}
-              className={`dashboard-topnav-tab${activeTab === key ? ' active' : ''}`}
-              onClick={() => setActiveTab(key)}
-            >
-              <Icon weight="bold" />
-              {label}
-            </button>
-          ))}
-        </nav>
-      </div>
+          {/* Tab Filter Buttons */}
+          <HStack gap={2}>
+            {MY_TASK_TABS.map(({ key, label }) => (
+              <Button
+                key={key}
+                variant={activeTab === key ? 'primary' : 'secondary'}
+                size="sm"
+                label={label}
+                onClick={() => setActiveTab(key)}
+              />
+            ))}
+          </HStack>
+        </VStack>
+      </LayoutHeader>
 
-      <div className="my-tasks-content">
+      {/* Content */}
+      <LayoutContent padding={4}>
         {activeTab === 'assigned' && (
-          <TaskTable
-            tickets={data.assigned}
-            empty="Nothing assigned to you."
-            dateLabel="Due"
-            dateRenderer={(ticket) => ticket.due_date || '—'}
-            onSelect={setSelectedTicketId}
-          />
+          data.assigned.length === 0 ? (
+            <EmptyState title="Nothing assigned" description="You have no tickets currently assigned to you." />
+          ) : (
+            <div style={{ backgroundColor: 'var(--color-background-surface)', borderRadius: 'var(--radius-container)', overflow: 'hidden', border: '1px solid var(--color-border)' }}>
+              <Table
+                data={data.assigned}
+                columns={columns}
+                density="standard"
+                onRowClick={(row) => setSelectedTicketId(row.id)}
+              />
+            </div>
+          )
         )}
-        {activeTab === 'mentions' && (
-          <MentionList mentions={data.mentions} onSelect={setSelectedTicketId} />
-        )}
-        {activeTab === 'watching' && (
-          <TaskTable
-            tickets={data.watching}
-            empty="No recent activity on watched tickets."
-            dateLabel="Updated"
-            dateRenderer={(ticket) => timeAgo(ticket.updated_at)}
-            onSelect={setSelectedTicketId}
-          />
-        )}
-        {activeTab === 'blockers' && (
-          <BlockerList tickets={data.blockers_cleared} onSelect={setSelectedTicketId} />
-        )}
-      </div>
 
+        {activeTab === 'mentions' && (
+          data.mentions.length === 0 ? (
+            <EmptyState title="No mentions" description="You have no unread mentions or notifications." />
+          ) : (
+            <div style={{ backgroundColor: 'var(--color-background-surface)', borderRadius: 'var(--radius-container)', overflow: 'hidden', border: '1px solid var(--color-border)' }}>
+              <Table
+                data={data.mentions.map((m) => ({
+                  id: m.ticket_id,
+                  number: m.ticket_number,
+                  title: m.ticket_title,
+                  status: 'in_progress',
+                  updated_at: m.created_at,
+                }))}
+                columns={columns}
+                density="standard"
+                onRowClick={(row) => setSelectedTicketId(row.id)}
+              />
+            </div>
+          )
+        )}
+
+        {activeTab === 'watching' && (
+          data.watching.length === 0 ? (
+            <EmptyState title="No watched tickets" description="Tickets you are watching will appear here." />
+          ) : (
+            <div style={{ backgroundColor: 'var(--color-background-surface)', borderRadius: 'var(--radius-container)', overflow: 'hidden', border: '1px solid var(--color-border)' }}>
+              <Table
+                data={data.watching}
+                columns={columns}
+                density="standard"
+                onRowClick={(row) => setSelectedTicketId(row.id)}
+              />
+            </div>
+          )
+        )}
+
+        {activeTab === 'blockers' && (
+          data.blockers_cleared.length === 0 ? (
+            <EmptyState title="No cleared blockers" description="Tickets with recently cleared blockers will appear here." />
+          ) : (
+            <div style={{ backgroundColor: 'var(--color-background-surface)', borderRadius: 'var(--radius-container)', overflow: 'hidden', border: '1px solid var(--color-border)' }}>
+              <Table
+                data={data.blockers_cleared}
+                columns={columns}
+                density="standard"
+                onRowClick={(row) => setSelectedTicketId(row.id)}
+              />
+            </div>
+          )
+        )}
+      </LayoutContent>
+
+      {/* Ticket Detail Dialog */}
       {selectedTicketId && (
         <TicketDetail
           ticketId={selectedTicketId}
-          onClose={() => { setSelectedTicketId(null); fetchData(); }}
+          onClose={() => {
+            setSelectedTicketId(null);
+            fetchData();
+          }}
+          currentUser={currentUser}
         />
       )}
-    </div>
+    </Layout>
   );
 }

@@ -50,15 +50,19 @@ export const POST = withAuth(async (request, user) => {
 
   if (ticketId) {
     const db = getDb();
-    const ticket = db.prepare('SELECT id FROM tickets WHERE id = ?').get(ticketId);
+    const parsedNum = Number(ticketId);
+    const ticket = db.prepare(
+      'SELECT id FROM tickets WHERE id = ? OR (? > 0 AND number = ?)'
+    ).get(ticketId, Number.isNaN(parsedNum) ? -1 : parsedNum, Number.isNaN(parsedNum) ? -1 : parsedNum);
     if (ticket) {
+      const resolvedTicketId = ticket.id;
       const insert = db.prepare(`
           INSERT INTO ticket_attachments (id, ticket_id, url, filename, mime_type, size_bytes, uploader_id)
           VALUES (?, ?, ?, ?, ?, ?, ?)
         `);
       const tx = db.transaction(() => {
         for (const file of uploaded) {
-          insert.run(randomUUID(), ticketId, file.url, file.filename, file.mime_type, file.size_bytes, user.id);
+          insert.run(randomUUID(), resolvedTicketId, file.url, file.filename, file.mime_type, file.size_bytes, user.id);
         }
       });
       tx();

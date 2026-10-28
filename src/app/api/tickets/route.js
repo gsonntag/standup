@@ -172,6 +172,7 @@ export function attachGitHubRepositories(db, tickets) {
 }
 
 export function getTicketById(db, id) {
+  const isNumeric = typeof id === 'number' || (typeof id === 'string' && /^\d+$/.test(id));
   const ticket = db.prepare(`
     SELECT t.*,
       assignee.username AS assignee_username,
@@ -192,8 +193,8 @@ export function getTicketById(db, id) {
     LEFT JOIN users assignee ON assignee.id = t.assignee_id
     JOIN users creator ON creator.id = t.creator_id
     LEFT JOIN github_repositories gr ON gr.id = t.github_repo_id
-    WHERE t.id = ?
-  `).get(id);
+    WHERE t.id = ? OR (t.number = ? AND ?)
+  `).get(id, isNumeric ? parseInt(id, 10) : -1, isNumeric ? 1 : 0);
   if (!ticket) return null;
   return attachGitHubRepositories(db, attachLabels(db, attachReviewers(db, attachAssignees(db, [ticket]))))[0];
 }

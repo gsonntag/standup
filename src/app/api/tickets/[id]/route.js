@@ -66,6 +66,7 @@ export const GET = withAuth(async (_request, _user, context) => {
   const id = await getId(context);
   const ticket = getTicketById(db, id);
   if (!ticket) return jsonError('Ticket not found.', 404);
+  const ticketId = ticket.id;
 
   ticket.blockers = db.prepare(`
     SELECT t.id, t.number, t.title, t.status
@@ -73,14 +74,14 @@ export const GET = withAuth(async (_request, _user, context) => {
     JOIN tickets t ON t.id = td.depends_on_id
     WHERE td.ticket_id = ?
     ORDER BY t.number ASC
-  `).all(id);
+  `).all(ticketId);
   ticket.unblocks = db.prepare(`
     SELECT t.id, t.number, t.title, t.status
     FROM ticket_dependencies td
     JOIN tickets t ON t.id = td.ticket_id
     WHERE td.depends_on_id = ?
     ORDER BY t.number ASC
-  `).all(id);
+  `).all(ticketId);
 
   ticket.events = db.prepare(`
     SELECT te.*, u.username AS actor_username
@@ -88,7 +89,7 @@ export const GET = withAuth(async (_request, _user, context) => {
     JOIN users u ON u.id = te.actor_id
     WHERE te.ticket_id = ?
     ORDER BY te.created_at ASC
-  `).all(id);
+  `).all(ticketId);
 
   ticket.attachments = db.prepare(`
     SELECT ta.*, u.username AS uploader_username
